@@ -37,11 +37,16 @@ window::window(void):
     smooth_points = new QCheckBox("Smooth points");
     point_size = new QDoubleSpinBox;
     lighting = new QCheckBox("Lighting");
+    normal_length = new QDoubleSpinBox;
+    colored = new QCheckBox("Colored");
+    colored->setCheckState(Qt::Checked);
 
     l2 = new QVBoxLayout;
     l2->addWidget(smooth_points);
     l2->addWidget(point_size);
     l2->addWidget(lighting);
+    l2->addWidget(normal_length);
+    l2->addWidget(colored);
     l2->addStretch();
 
     int highest = fls(QGLFormat::openGLVersionFlags());
@@ -60,6 +65,8 @@ window::window(void):
     connect(smooth_points, SIGNAL(stateChanged(int)), gl, SLOT(change_point_smoothness(int)));
     connect(point_size, SIGNAL(valueChanged(double)), gl, SLOT(change_point_size(double)));
     connect(lighting, SIGNAL(stateChanged(int)), gl, SLOT(change_lighting(int)));
+    connect(normal_length, SIGNAL(valueChanged(double)), gl, SLOT(change_normal_length(double)));
+    connect(colored, SIGNAL(stateChanged(int)), gl, SLOT(change_colors(int)));
 
     l1 = new QHBoxLayout;
     l1->addWidget(gl, 1);

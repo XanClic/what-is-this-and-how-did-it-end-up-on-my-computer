@@ -18,6 +18,12 @@ cloud::cloud(void):
 }
 
 
+cloud::~cloud(void)
+{
+    delete varr;
+}
+
+
 static bool crlf_getline(std::ifstream &s, std::string &str)
 {
     if (!std::getline(s, str))
