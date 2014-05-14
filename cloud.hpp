@@ -14,6 +14,7 @@
 class cloud {
     public:
         cloud(void);
+        ~cloud(void);
 
 
         void load(std::ifstream &s);
@@ -29,6 +30,7 @@ class cloud {
         { return trans; }
 
         dake::gl::vertex_array *vertex_array(void);
+        dake::gl::vertex_array *normal_vertex_array(void);
 
 
     private:

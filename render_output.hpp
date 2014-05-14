@@ -17,13 +17,22 @@ class render_output:
         render_output(QGLFormat fmt, QDoubleSpinBox *point_size_widget, QWidget *parent = nullptr);
         ~render_output(void);
 
-        dake::gl::program *active_program(void)
-        { return lighting ? lprg : tprg; }
+        dake::gl::program *select_program(bool normals);
 
         bool lighting_enabled(void) const
         { return lighting; }
         void enable_lighting(bool enable)
         { lighting = enable; }
+
+        bool colors_enabled(void) const
+        { return colored; }
+        void enable_colors(bool enable)
+        { colored = enable; }
+
+        float normal_length(void) const
+        { return normlen; }
+        void set_normal_length(float len)
+        { normlen = len; }
 
         const dake::math::mat4 &projection(void) const
         { return proj; }
@@ -33,7 +42,9 @@ class render_output:
     public slots:
         void change_point_size(double sz);
         void change_point_smoothness(int smooth);
-        void change_lighting(int lighting);
+        void change_lighting(int lighting) { enable_lighting(lighting); }
+        void change_colors(int colored) { enable_colors(colored); }
+        void change_normal_length(double length) { set_normal_length(length); }
 
     protected:
         void initializeGL(void);
@@ -42,10 +53,11 @@ class render_output:
 
     private:
         QDoubleSpinBox *psw;
-        dake::gl::program *tprg, *lprg;
+        dake::gl::program *prgs = nullptr, *current_prg = nullptr;
         QTimer *redraw_timer;
         dake::math::mat4 proj;
-        bool lighting = false;
+        bool lighting = false, colored = true;
+        float normlen = 0.f;
 };
 
 #endif

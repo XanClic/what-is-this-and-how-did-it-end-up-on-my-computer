@@ -28,8 +28,8 @@ class window:
         render_output *gl;
         QHBoxLayout *l1;
         QVBoxLayout *l2;
-        QCheckBox *smooth_points, *lighting;
-        QDoubleSpinBox *point_size;
+        QCheckBox *smooth_points, *lighting, *colored;
+        QDoubleSpinBox *point_size, *normal_length;
 };
 
 #endif

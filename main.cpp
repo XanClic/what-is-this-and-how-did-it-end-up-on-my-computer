@@ -1,5 +1,6 @@
 #include <QApplication>
 #include <dake/math/matrix.hpp>
+#include <dake/gl/shader.hpp>
 
 #include "cloud.hpp"
 #include "window.hpp"
@@ -24,14 +25,23 @@ int main(int argc, char *argv[])
 
 void draw_clouds(void)
 {
-    dake::math::mat4 m(c.transformation().translated(dake::math::vec3(0.f, 0.f, -5.f)));
-    wnd->renderer()->active_program()->uniform<dake::math::mat4>("mvp") = wnd->renderer()->projection() * m;
+    dake::math::mat4 mv(c.transformation().translated(dake::math::vec3(0.f, 0.f, -5.f)));
+    dake::math::mat3 norm(mv);
+    norm.transposed_invert();
+
+    dake::gl::program *prg = wnd->renderer()->select_program(false);
+    prg->uniform<dake::math::mat4>("mv") = mv;
     if (wnd->renderer()->lighting_enabled()) {
-        dake::math::mat3 norm(m);
-        norm.transposed_invert();
-        wnd->renderer()->active_program()->uniform<dake::math::mat3>("nmat") = norm;
-        wnd->renderer()->active_program()->uniform<dake::math::vec3>("light_dir") = dake::math::vec3(.5f, -1.f, .5f).normalized();
+        prg->uniform<dake::math::mat3>("nmat") = norm;
+        prg->uniform<dake::math::vec3>("light_dir") = dake::math::vec3(.5f, -1.f, .5f).normalized();
     }
+
+    c.vertex_array()->draw(GL_POINTS);
+
+
+    prg = wnd->renderer()->select_program(true);
+    prg->uniform<dake::math::mat4>("mv") = mv;
+    prg->uniform<dake::math::mat3>("nmat") = norm;
 
     c.vertex_array()->draw(GL_POINTS);
 }
