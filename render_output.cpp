@@ -4,6 +4,8 @@
 #include <QtOpenGL>
 #include <QDoubleSpinBox>
 #include <QTimer>
+#include <QMouseEvent>
+#include <QWheelEvent>
 #include <dake/math/matrix.hpp>
 #include <dake/gl/shader.hpp>
 
@@ -30,7 +32,8 @@ enum program_flags {
 render_output::render_output(QGLFormat fmt, QDoubleSpinBox *point_size_widget, QWidget *parent):
     QGLWidget(fmt, parent),
     psw(point_size_widget),
-    proj(dake::math::mat4::identity())
+    proj(dake::math::mat4::identity()),
+    mv  (dake::math::mat4::identity().translated(dake::math::vec3(0.f, 0.f, -5.f)))
 {
     redraw_timer = new QTimer(this);
     connect(redraw_timer, SIGNAL(timeout()), this, SLOT(updateGL()));
@@ -80,6 +83,14 @@ void render_output::change_point_smoothness(int smooth)
         glDisable(GL_POINT_SMOOTH);
     }
 
+}
+
+
+void render_output::change_fov(double fov_deg)
+{
+    fov = static_cast<float>(fov_deg) * static_cast<float>(M_PI) / 180.f;
+
+    resizeGL(w, h);
 }
 
 
@@ -200,11 +211,11 @@ void render_output::initializeGL(void)
                "uniform float normal_scale;\n"
                "void main(void)\n"
                "{\n"
-               "    gf_color = vg_normal[0];\n"
+               "    gf_color = abs(vg_normal[0]);\n"
                "    gl_Position = proj * gl_in[0].gl_Position;\n"
                "    EmitVertex();\n"
                "\n"
-               "    gf_color = vg_normal[0];\n"
+               "    gf_color = abs(vg_normal[0]);\n"
                "    gl_Position = proj * vec4(gl_in[0].gl_Position.xyz + normal_scale * (nmat * vg_normal[0]), 1.0);\n"
                "    EmitVertex();\n"
                "\n"
@@ -258,11 +269,15 @@ void render_output::initializeGL(void)
     redraw_timer->start(0);
 }
 
-void render_output::resizeGL(int w, int h)
+
+void render_output::resizeGL(int wdt, int hgt)
 {
+    w = wdt;
+    h = hgt;
+
     glViewport(0, 0, w, h);
 
-    proj = dake::math::mat4::projection(M_PI / 4.f, static_cast<float>(w) / h, .1f, 100.f);
+    proj = dake::math::mat4::projection(fov, static_cast<float>(w) / h, .1f, 100.f);
 
     dake::gl::program *cur = current_prg;
     for (int i = 0; i < PROGRAM_COUNT; i++)
@@ -271,6 +286,7 @@ void render_output::resizeGL(int w, int h)
         cur->use();
 }
 
+
 extern void draw_clouds(void);
 
 void render_output::paintGL(void)
@@ -278,4 +294,56 @@ void render_output::paintGL(void)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     draw_clouds();
+}
+
+
+void render_output::mousePressEvent(QMouseEvent *evt)
+{
+    if ((evt->button() == Qt::LeftButton) && !move_camera) {
+        grabMouse(Qt::ClosedHandCursor);
+
+        rotate_camera = true;
+
+        rot_l_x = evt->x();
+        rot_l_y = evt->y();
+    } else if ((evt->button() == Qt::RightButton) && !rotate_camera) {
+        grabMouse(Qt::ClosedHandCursor);
+
+        move_camera = true;
+
+        rot_l_x = evt->x();
+        rot_l_y = evt->y();
+    }
+}
+
+
+void render_output::mouseReleaseEvent(QMouseEvent *evt)
+{
+    if ((evt->button() == Qt::LeftButton) && rotate_camera) {
+        releaseMouse();
+        rotate_camera = false;
+    } else if ((evt->button() == Qt::RightButton) && move_camera) {
+        releaseMouse();
+        move_camera = false;
+    }
+}
+
+
+void render_output::mouseMoveEvent(QMouseEvent *evt)
+{
+    if (rotate_camera) {
+        mv = dake::math::mat4::identity().rotated((rot_l_x - evt->x()) / 4.f * static_cast<float>(M_PI) / 180.f, dake::math::vec3(0.f, 1.f, 0.f)) * mv;
+        mv = dake::math::mat4::identity().rotated((rot_l_y - evt->y()) / 4.f * static_cast<float>(M_PI) / 180.f, dake::math::vec3(1.f, 0.f, 0.f)) * mv;
+    } else {
+        mv = dake::math::mat4::identity().translated(dake::math::vec3((rot_l_x - evt->x()) / 100.f, (evt->y() - rot_l_y) / 100.f, 0.f)) * mv;
+    }
+
+    rot_l_x = evt->x();
+    rot_l_y = evt->y();
+}
+
+
+void render_output::wheelEvent(QWheelEvent *evt)
+{
+    mv = dake::math::mat4::identity().translated(dake::math::vec3(0.f, 0.f, evt->delta() / 360.f)) * mv;
 }

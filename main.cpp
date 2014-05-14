@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
 
 void draw_clouds(void)
 {
-    dake::math::mat4 mv(c.transformation().translated(dake::math::vec3(0.f, 0.f, -5.f)));
+    dake::math::mat4 mv(wnd->renderer()->modelview() * c.transformation());
     dake::math::mat3 norm(mv);
     norm.transposed_invert();
 
