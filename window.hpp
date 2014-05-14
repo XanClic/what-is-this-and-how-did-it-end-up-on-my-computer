@@ -28,7 +28,7 @@ class window:
         render_output *gl;
         QHBoxLayout *l1;
         QVBoxLayout *l2;
-        QCheckBox *smooth_points;
+        QCheckBox *smooth_points, *lighting;
         QDoubleSpinBox *point_size;
 };
 
