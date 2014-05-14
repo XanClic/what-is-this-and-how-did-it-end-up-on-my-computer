@@ -1,0 +1,4 @@
+libdake.a
+dake
+.syntastic_cpp_config
+.clang_complete
