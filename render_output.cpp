@@ -47,6 +47,12 @@ void render_output::change_point_smoothness(int smooth)
 }
 
 
+void render_output::change_lighting(int lighting)
+{
+    enable_lighting(lighting);
+}
+
+
 void render_output::initializeGL(void)
 {
     int maj, min;
@@ -66,26 +72,39 @@ void render_output::initializeGL(void)
     psw->setMinimum(psr[0]);
     psw->setMaximum(psr[1]);
 
-    dake::gl::shader vsh(dake::gl::shader::VERTEX);
-    vsh.source("#version 150 core\n"
+    dake::gl::shader tvsh(dake::gl::shader::VERTEX);
+    tvsh.source("#version 150 core\n"
                "in vec3 in_position;\n"
-               "in vec3 in_normal;\n"
                "in vec3 in_color;\n"
-               "out vec3 vf_normal;\n"
                "out vec3 vf_color;\n"
                "uniform mat4 mvp;\n"
                "void main(void)\n"
                "{\n"
                "    gl_Position = mvp * vec4(in_position, 1.0);\n"
-               "    vf_normal = in_normal;\n"
                "    vf_color = in_color;\n"
                "}");
-    if (!vsh.compile())
-        throw std::logic_error("Could not compile vertex shader");
+    if (!tvsh.compile())
+        throw std::logic_error("Could not compile trivial vertex shader");
+
+    dake::gl::shader lvsh(dake::gl::shader::VERTEX);
+    lvsh.source("#version 150 core\n"
+               "in vec3 in_position;\n"
+               "in vec3 in_normal;\n"
+               "in vec3 in_color;\n"
+               "out vec3 vf_color;\n"
+               "uniform mat4 mvp;\n"
+               "uniform mat3 nmat;\n"
+               "uniform vec3 light_dir;\n"
+               "void main(void)\n"
+               "{\n"
+               "    gl_Position = mvp * vec4(in_position, 1.0);\n"
+               "    vf_color = max(dot(nmat * in_normal, light_dir), 0.0) * in_color;\n"
+               "}");
+    if (!lvsh.compile())
+        throw std::logic_error("Could not compile lighting vertex shader");
 
     dake::gl::shader fsh(dake::gl::shader::FRAGMENT);
     fsh.source("#version 150 core\n"
-               "in vec3 vf_normal;\n"
                "in vec3 vf_color;\n"
                "out vec4 out_color;\n"
                "void main(void)\n"
@@ -95,20 +114,36 @@ void render_output::initializeGL(void)
     if (!fsh.compile())
         throw std::logic_error("Could not compile fragment shader");
 
-    prg = new dake::gl::program;
-    *prg << vsh;
-    *prg << fsh;
 
-    prg->bind_attrib("in_position", 0);
-    prg->bind_attrib("in_normal", 1);
-    prg->bind_attrib("in_color", 2);
+    tprg = new dake::gl::program;
+    *tprg << tvsh;
+    *tprg << fsh;
 
-    prg->bind_frag("out_color", 0);
+    tprg->bind_attrib("in_position", 0);
+    tprg->bind_attrib("in_normal", 1);
+    tprg->bind_attrib("in_color", 2);
 
-    if (!prg->link())
-        throw std::logic_error("Could not link program");
+    tprg->bind_frag("out_color", 0);
 
-    prg->use();
+    if (!tprg->link())
+        throw std::logic_error("Could not link trivial program");
+
+
+    lprg = new dake::gl::program;
+    *lprg << lvsh;
+    *lprg << fsh;
+
+    lprg->bind_attrib("in_position", 0);
+    lprg->bind_attrib("in_normal", 1);
+    lprg->bind_attrib("in_color", 2);
+
+    lprg->bind_frag("out_color", 0);
+
+    if (!lprg->link())
+        throw std::logic_error("Could not link lighting program");
+
+
+    tprg->use();
 
     redraw_timer->start(0);
 }

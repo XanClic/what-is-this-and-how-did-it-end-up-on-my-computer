@@ -18,7 +18,12 @@ class render_output:
         ~render_output(void);
 
         dake::gl::program *active_program(void)
-        { return prg; }
+        { return lighting ? lprg : tprg; }
+
+        bool lighting_enabled(void) const
+        { return lighting; }
+        void enable_lighting(bool enable)
+        { lighting = enable; }
 
         const dake::math::mat4 &projection(void) const
         { return proj; }
@@ -28,6 +33,7 @@ class render_output:
     public slots:
         void change_point_size(double sz);
         void change_point_smoothness(int smooth);
+        void change_lighting(int lighting);
 
     protected:
         void initializeGL(void);
@@ -36,9 +42,10 @@ class render_output:
 
     private:
         QDoubleSpinBox *psw;
-        dake::gl::program *prg;
+        dake::gl::program *tprg, *lprg;
         QTimer *redraw_timer;
         dake::math::mat4 proj;
+        bool lighting = false;
 };
 
 #endif
