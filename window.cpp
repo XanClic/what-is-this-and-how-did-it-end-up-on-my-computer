@@ -39,9 +39,19 @@ window::window(void):
     smooth_points = new QCheckBox("Smooth points");
     point_size_label = new QLabel("Point size:");
     point_size = new QDoubleSpinBox;
-    lighting = new QCheckBox("Lighting");
     colored = new QCheckBox("Colored");
     colored->setCheckState(Qt::Checked);
+    lighting = new QCheckBox("Lighting");
+    ld = new QLabel("Light direction:");
+    ld_x = new QDoubleSpinBox;
+    ld_x->setSingleStep(.1);
+    ld_x->setRange(-HUGE_VAL, HUGE_VAL);
+    ld_y = new QDoubleSpinBox;
+    ld_y->setSingleStep(.1);
+    ld_y->setRange(-HUGE_VAL, HUGE_VAL);
+    ld_z = new QDoubleSpinBox;
+    ld_z->setSingleStep(.1);
+    ld_z->setRange(-HUGE_VAL, HUGE_VAL);
     normal_length_label = new QLabel("Normal length:");
     normal_length = new QDoubleSpinBox;
     normal_length->setSingleStep(.1);
@@ -51,12 +61,19 @@ window::window(void):
     fov->setValue(45.);
     fov->setRange(.01, 179.99);
 
+    ldl = new QHBoxLayout;
+    ldl->addWidget(ld_x);
+    ldl->addWidget(ld_y);
+    ldl->addWidget(ld_z);
+
     l2 = new QVBoxLayout;
     l2->addWidget(smooth_points);
     l2->addWidget(point_size_label);
     l2->addWidget(point_size);
-    l2->addWidget(lighting);
     l2->addWidget(colored);
+    l2->addWidget(lighting);
+    l2->addWidget(ld);
+    l2->addLayout(ldl);
     l2->addWidget(normal_length_label);
     l2->addWidget(normal_length);
     l2->addWidget(fov_label);
@@ -73,13 +90,20 @@ window::window(void):
     fmt.setProfile(QGLFormat::CoreProfile);
     fmt.setVersion(version >> 4, version & 0xf);
 
+    if (((version >> 4) < 3) || (((version >> 4) == 3) && ((version & 0xf) < 3))) {
+        throw std::runtime_error("OpenGL 3.3+ is required");
+    }
+
     printf("Selecting OpenGL %i.%i Core\n", version >> 4, version & 0xf);
 
     gl = new render_output(fmt, point_size);
     connect(smooth_points, SIGNAL(stateChanged(int)), gl, SLOT(change_point_smoothness(int)));
     connect(point_size, SIGNAL(valueChanged(double)), gl, SLOT(change_point_size(double)));
-    connect(lighting, SIGNAL(stateChanged(int)), gl, SLOT(change_lighting(int)));
     connect(colored, SIGNAL(stateChanged(int)), gl, SLOT(change_colors(int)));
+    connect(lighting, SIGNAL(stateChanged(int)), gl, SLOT(change_lighting(int)));
+    connect(ld_x, SIGNAL(valueChanged(double)), gl, SLOT(change_ld_x(double)));
+    connect(ld_y, SIGNAL(valueChanged(double)), gl, SLOT(change_ld_y(double)));
+    connect(ld_z, SIGNAL(valueChanged(double)), gl, SLOT(change_ld_z(double)));
     connect(normal_length, SIGNAL(valueChanged(double)), gl, SLOT(change_normal_length(double)));
     connect(fov, SIGNAL(valueChanged(double)), gl, SLOT(change_fov(double)));
 
@@ -94,13 +118,18 @@ window::~window(void)
 {
     delete l1;
     delete l2;
+    delete ldl;
     delete gl;
     delete fov;
     delete fov_label;
     delete normal_length;
     delete normal_length_label;
-    delete colored;
+    delete ld_z;
+    delete ld_y;
+    delete ld_x;
+    delete ld;
     delete lighting;
+    delete colored;
     delete point_size;
     delete point_size_label;
     delete smooth_points;

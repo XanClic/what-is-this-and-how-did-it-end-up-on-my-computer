@@ -1,5 +1,6 @@
 #include <cassert>
 #include <cstring>
+#include <list>
 #include <stdexcept>
 #include <QtOpenGL>
 #include <QDoubleSpinBox>
@@ -9,6 +10,7 @@
 #include <dake/math/matrix.hpp>
 #include <dake/gl/shader.hpp>
 
+#include "cloud.hpp"
 #include "render_output.hpp"
 
 
@@ -33,7 +35,8 @@ render_output::render_output(QGLFormat fmt, QDoubleSpinBox *point_size_widget, Q
     QGLWidget(fmt, parent),
     psw(point_size_widget),
     proj(dake::math::mat4::identity()),
-    mv  (dake::math::mat4::identity().translated(dake::math::vec3(0.f, 0.f, -5.f)))
+    mv  (dake::math::mat4::identity().translated(dake::math::vec3(0.f, 0.f, -5.f))),
+    light_dir(0.f, 0.f, 0.f)
 {
     redraw_timer = new QTimer(this);
     connect(redraw_timer, SIGNAL(timeout()), this, SLOT(updateGL()));
@@ -47,9 +50,11 @@ render_output::~render_output(void)
 
 dake::gl::program *render_output::select_program(bool normals)
 {
-    dake::gl::program *selected = &prgs[(lighting * LIGHTING) |
-                                        (normals  * NORMALS)  |
-                                        (colored  * COLORED)];
+    bool tl = lighting && light_dir.length();
+
+    dake::gl::program *selected = &prgs[(tl      * LIGHTING) |
+                                        (normals * NORMALS)  |
+                                        (colored * COLORED)];
 
     if (selected != current_prg) {
         selected->use();
@@ -287,13 +292,35 @@ void render_output::resizeGL(int wdt, int hgt)
 }
 
 
-extern void draw_clouds(void);
+extern std::list<cloud> clouds;
+
 
 void render_output::paintGL(void)
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    draw_clouds();
+
+    for (auto c: clouds) {
+        dake::math::mat4 mv(this->mv * c.transformation());
+        dake::math::mat3 norm(mv);
+        norm.transposed_invert();
+
+        dake::gl::program *prg = select_program(false);
+        prg->uniform<dake::math::mat4>("mv") = mv;
+        if (lighting && light_dir.length()) {
+            prg->uniform<dake::math::mat3>("nmat") = norm;
+            prg->uniform<dake::math::vec3>("light_dir") = light_dir.normalized();
+        }
+
+        c.vertex_array()->draw(GL_POINTS);
+
+
+        prg = select_program(true);
+        prg->uniform<dake::math::mat4>("mv") = mv;
+        prg->uniform<dake::math::mat3>("nmat") = norm;
+
+        c.vertex_array()->draw(GL_POINTS);
+    }
 }
 
 

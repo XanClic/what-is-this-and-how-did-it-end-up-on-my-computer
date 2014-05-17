@@ -46,6 +46,11 @@ class render_output:
         dake::math::mat4 &modelview(void)
         { return mv; }
 
+        const dake::math::vec3 &light_direction(void) const
+        { return light_dir; }
+        dake::math::vec3 &light_direction(void)
+        { return light_dir; }
+
     public slots:
         void change_point_size(double sz);
         void change_point_smoothness(int smooth);
@@ -53,6 +58,9 @@ class render_output:
         void change_colors(int colored) { enable_colors(colored); }
         void change_normal_length(double length) { set_normal_length(length); }
         void change_fov(double fov_deg);
+        void change_ld_x(double ld_x) { light_direction().x() = ld_x; }
+        void change_ld_y(double ld_y) { light_direction().y() = ld_y; }
+        void change_ld_z(double ld_z) { light_direction().z() = ld_z; }
 
     protected:
         void initializeGL(void);
@@ -68,6 +76,7 @@ class render_output:
         dake::gl::program *prgs = nullptr, *current_prg = nullptr;
         QTimer *redraw_timer;
         dake::math::mat4 proj, mv;
+        dake::math::vec3 light_dir;
         bool lighting = false, colored = true, rotate_camera = false, move_camera = false;
         float normlen = 0.f;
         float rot_l_x, rot_l_y;
