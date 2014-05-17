@@ -27,11 +27,11 @@ class window:
         QWidget *i_hate_qt;
 
         render_output *gl;
-        QHBoxLayout *l1;
+        QHBoxLayout *l1, *ldl;
         QVBoxLayout *l2;
         QCheckBox *smooth_points, *lighting, *colored;
-        QDoubleSpinBox *point_size, *normal_length, *fov;
-        QLabel *point_size_label, *normal_length_label, *fov_label;
+        QDoubleSpinBox *point_size, *normal_length, *fov, *ld_x, *ld_y, *ld_z;
+        QLabel *point_size_label, *normal_length_label, *fov_label, *ld;
 };
 
 #endif
