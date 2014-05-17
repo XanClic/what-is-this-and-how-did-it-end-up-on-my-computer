@@ -12,8 +12,9 @@
 #include "point.hpp"
 
 
-cloud::cloud(void):
-    trans(dake::math::mat4::identity())
+cloud::cloud(const std::string &name):
+    trans(dake::math::mat4::identity()),
+    n(name)
 {
 }
 
@@ -167,7 +168,7 @@ void cloud::load(std::ifstream &s)
 }
 
 
-void cloud::store(std::ofstream &s)
+void cloud::store(std::ofstream &s) const
 {
     s << "ply" << std::endl;
     s << "format ascii 1.0" << std::endl;
@@ -230,4 +231,14 @@ dake::gl::vertex_array *cloud::vertex_array(void)
     }
 
     return varr;
+}
+
+
+void cloud_manager::unify(float resolution, const std::string &name)
+{
+    cloud unified(*c, resolution, name);
+
+    delete c;
+    c = new std::list<cloud>;
+    c->push_back(std::move(unified));
 }
