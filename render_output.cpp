@@ -1,4 +1,3 @@
-#include <cassert>
 #include <cstring>
 #include <list>
 #include <stdexcept>
@@ -292,7 +291,7 @@ void render_output::resizeGL(int wdt, int hgt)
 }
 
 
-extern std::list<cloud> clouds;
+extern cloud_manager cm;
 
 
 void render_output::paintGL(void)
@@ -300,7 +299,7 @@ void render_output::paintGL(void)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
-    for (auto c: clouds) {
+    for (auto c: cm.clouds()) {
         dake::math::mat4 mv(this->mv * c.transformation());
         dake::math::mat3 norm(mv);
         norm.transposed_invert();
