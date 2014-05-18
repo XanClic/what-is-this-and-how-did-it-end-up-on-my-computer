@@ -4,7 +4,6 @@
 #include <fstream>
 #include <iostream>
 #include <libgen.h>
-#include <memory>
 #include <QApplication>
 
 #include "cloud.hpp"
@@ -34,7 +33,10 @@ int main(int argc, char *argv[])
         cm.load_new(inp, basename(name_copy));
     }
 
-    std::shared_ptr<window> wnd(new window);
+    // Putting this in something fancy like an std::shared_ptr doesn't suit Qt,
+    // everything will go to hell - so don't do it
+    // (find out more on Qt and me in window.cpp)
+    window *wnd = new window;
     wnd->show();
 
     return app.exec();
