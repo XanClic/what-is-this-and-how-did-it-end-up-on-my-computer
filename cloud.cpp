@@ -134,7 +134,7 @@ void cloud::load(std::ifstream &s)
         pt.normal   = vec3::zero();
         pt.color    = vec3(1.f, 1.f, 1.f);
 
-        for (auto prop: properties) {
+        for (const auto &prop: properties) {
             float real_val;
 
             switch (prop.type) {
@@ -188,7 +188,7 @@ void cloud::store(std::ofstream &s) const
     s << "property uchar blue" << std::endl;
     s << "end_header" << std::endl;
 
-    for (auto pt: p) {
+    for (const point &pt: p) {
         s << pt.position.x() << ' '
           << pt.position.y() << ' '
           << pt.position.z() << ' '

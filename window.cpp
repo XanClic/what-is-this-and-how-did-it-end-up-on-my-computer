@@ -285,7 +285,7 @@ void window::load_cloud(void)
                                                       QString(),
                                                       "Polygon files (*.ply);;All files (*.*)");
 
-    for (auto path: paths) {
+    for (const auto &path: paths) {
         std::ifstream inp(path.toUtf8().constData());
         if (!inp.is_open()) {
             QMessageBox::critical(this, "Could not open file", QString("Could not open ") + path + QString(": ") + QString(strerror(errno)));
