@@ -53,8 +53,7 @@ class cloud {
         {
             using namespace dake::math;
 
-            // Let's just pray the user has enough memory for this
-            std::unordered_map<vec3i, std::list<point>> clusters;
+            std::unordered_map<vec3i, point_counter> result;
             int round_mode = fegetround();
             fesetround(FE_DOWNWARD);
 
@@ -68,28 +67,30 @@ class cloud {
                     vec3 index_flt(global_pos / resolution);
                     vec3i index(lrint(index_flt.x()), lrint(index_flt.y()), lrint(index_flt.z()));
 
-                    clusters[index].emplace_back(vec3(global_pos), norm_trans * p.normal, p.color, p.density);
+                    auto entry = result.find(index);
+                    if (entry == result.end()) {
+                        result.emplace(index, point_counter(global_pos, norm_trans * p.normal, p.color, p.density));
+                    } else {
+                        // Let's just pray this doesn't overflow
+                        entry->second.position += vec3(global_pos);
+                        entry->second.normal   += norm_trans * p.normal;
+                        entry->second.color    += p.color;
+                        entry->second.density  += p.density;
+                        entry->second.count++;
+                    }
                 }
             }
 
             fesetround(round_mode);
 
-            for (const auto &cluster: clusters) {
-                point result(vec3::zero(), vec3::zero(), vec3::zero(), 0.f);
-                size_t cpc = cluster.second.size(); // cluster point count
+            for (const auto &pc: result) {
+                const auto &pt = pc.second;
 
-                for (const point &p: cluster.second) {
-                    result.position += p.position / cpc;
-                    result.normal   += p.normal;
-                    result.color    += p.color    / cpc;
-                    result.density  += p.density  / cpc;
+                p.emplace_back(pt.position / pt.count, pt.normal, pt.color / pt.count, pt.density / pt.count);
+
+                if (p.back().normal.length()) {
+                    p.back().normal.normalize();
                 }
-
-                if (result.normal.length()) {
-                    result.normal.normalize();
-                }
-
-                p.push_back(std::move(result));
             }
         }
 
@@ -125,6 +126,11 @@ class cloud {
         dake::gl::vertex_array *varr = nullptr;
         bool varr_valid = false;
         std::string n;
+
+        struct point_counter: public point {
+            point_counter(dake::math::vec3 p, dake::math::vec3 n, dake::math::vec3 c, float d): point(p, n, c, d), count(1) {}
+            size_t count;
+        };
 };
 
 
