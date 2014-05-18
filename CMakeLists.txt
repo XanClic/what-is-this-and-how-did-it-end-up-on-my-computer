@@ -25,7 +25,7 @@ ExternalProject_Get_Property(dake binary_dir)
 include_directories(${binary_dir}/include)
 link_directories(${binary_dir})
 
-add_executable(cg2p1 main.cpp cloud.cpp window.cpp render_output.cpp)
+add_executable(cg2p1 main.cpp cloud.cpp window.cpp render_output.cpp shader_sources.cpp)
 target_link_libraries(cg2p1 libdake.a ${OPENGL_LIBRARIES})
 add_dependencies(cg2p1 dake)
 
