@@ -51,29 +51,31 @@ class cloud {
             trans(dake::math::mat4::identity()),
             n(name)
         {
+            using namespace dake::math;
+
             // Let's just pray the user has enough memory for this
-            std::unordered_map<dake::math::vec3i, std::list<point>> clusters;
+            std::unordered_map<vec3i, std::list<point>> clusters;
             int round_mode = fegetround();
             fesetround(FE_DOWNWARD);
 
             for (const cloud &c: input) {
-                const dake::math::mat4 &pos_trans = c.trans;
-                dake::math::mat3 norm_trans(pos_trans);
+                const mat4 &pos_trans = c.trans;
+                mat3 norm_trans(pos_trans);
                 norm_trans.transposed_invert();
 
                 for (const point &p: c.points()) {
-                    dake::math::vec3 global_pos(pos_trans * dake::math::vec4(p.position.x(), p.position.y(), p.position.z(), 1.f));
-                    dake::math::vec3 index_flt(global_pos / resolution);
-                    dake::math::vec3i index(lrint(index_flt.x()), lrint(index_flt.y()), lrint(index_flt.z()));
+                    vec3 global_pos(pos_trans * vec4(p.position.x(), p.position.y(), p.position.z(), 1.f));
+                    vec3 index_flt(global_pos / resolution);
+                    vec3i index(lrint(index_flt.x()), lrint(index_flt.y()), lrint(index_flt.z()));
 
-                    clusters[index].emplace_back(dake::math::vec3(global_pos), norm_trans * p.normal, p.color, p.density);
+                    clusters[index].emplace_back(vec3(global_pos), norm_trans * p.normal, p.color, p.density);
                 }
             }
 
             fesetround(round_mode);
 
             for (auto cluster: clusters) {
-                point result(dake::math::vec3::zero(), dake::math::vec3::zero(), dake::math::vec3::zero(), 0.f);
+                point result(vec3::zero(), vec3::zero(), vec3::zero(), 0.f);
                 size_t cpc = cluster.second.size(); // cluster point count
 
                 for (auto p: cluster.second) {

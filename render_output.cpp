@@ -13,6 +13,11 @@
 #include "render_output.hpp"
 
 
+using namespace dake;
+using namespace dake::math;
+using namespace dake::gl;
+
+
 enum program_flag_bits {
     BIT_LIGHTING,
     BIT_NORMALS,
@@ -33,8 +38,8 @@ enum program_flags {
 render_output::render_output(QGLFormat fmt, QDoubleSpinBox *point_size_widget, QWidget *parent):
     QGLWidget(fmt, parent),
     psw(point_size_widget),
-    proj(dake::math::mat4::identity()),
-    mv  (dake::math::mat4::identity().translated(dake::math::vec3(0.f, 0.f, -5.f))),
+    proj(mat4::identity()),
+    mv  (mat4::identity().translated(vec3(0.f, 0.f, -5.f))),
     light_dir(0.f, 0.f, 0.f)
 {
     redraw_timer = new QTimer(this);
@@ -47,13 +52,13 @@ render_output::~render_output(void)
 }
 
 
-dake::gl::program *render_output::select_program(bool normals)
+gl::program *render_output::select_program(bool normals)
 {
     bool tl = lighting && light_dir.length();
 
-    dake::gl::program *selected = &prgs[(tl      * LIGHTING) |
-                                        (normals * NORMALS)  |
-                                        (colored * COLORED)];
+    gl::program *selected = &prgs[(tl      * LIGHTING) |
+                                  (normals * NORMALS)  |
+                                  (colored * COLORED)];
 
     if (selected != current_prg) {
         selected->use();
@@ -117,7 +122,7 @@ void render_output::initializeGL(void)
     psw->setMinimum(psr[0]);
     psw->setMaximum(psr[1]);
 
-    dake::gl::shader tvsh(dake::gl::shader::VERTEX);
+    shader tvsh(shader::VERTEX);
     tvsh.source("#version 150 core\n"
                 "in vec3 in_position;\n"
                 "in vec3 in_normal;\n"
@@ -134,7 +139,7 @@ void render_output::initializeGL(void)
     if (!tvsh.compile())
         throw std::logic_error("Could not compile trivial vertex shader");
 
-    dake::gl::shader lvsh(dake::gl::shader::VERTEX);
+    shader lvsh(shader::VERTEX);
     lvsh.source("#version 150 core\n"
                 "in vec3 in_position;\n"
                 "in vec3 in_normal;\n"
@@ -153,7 +158,7 @@ void render_output::initializeGL(void)
     if (!lvsh.compile())
         throw std::logic_error("Could not compile lighting vertex shader");
 
-    dake::gl::shader utvsh(dake::gl::shader::VERTEX);
+    shader utvsh(shader::VERTEX);
     utvsh.source("#version 150 core\n"
                  "in vec3 in_position;\n"
                  "in vec3 in_normal;\n"
@@ -169,7 +174,7 @@ void render_output::initializeGL(void)
     if (!utvsh.compile())
         throw std::logic_error("Could not compile uncolored trivial vertex shader");
 
-    dake::gl::shader ulvsh(dake::gl::shader::VERTEX);
+    shader ulvsh(shader::VERTEX);
     ulvsh.source("#version 150 core\n"
                  "in vec3 in_position;\n"
                  "in vec3 in_normal;\n"
@@ -187,7 +192,7 @@ void render_output::initializeGL(void)
     if (!ulvsh.compile())
         throw std::logic_error("Could not compile uncolored lighting vertex shader");
 
-    dake::gl::shader tgsh(dake::gl::shader::GEOMETRY);
+    shader tgsh(shader::GEOMETRY);
     tgsh.source("#version 150 core\n"
                 "layout(points) in;\n"
                 "layout(points, max_vertices=1) out;\n"
@@ -204,7 +209,7 @@ void render_output::initializeGL(void)
     if (!tgsh.compile())
         throw std::logic_error("Could not compile trivial geometry shader");
 
-    dake::gl::shader ngsh(dake::gl::shader::GEOMETRY);
+    shader ngsh(shader::GEOMETRY);
     ngsh.source("#version 150 core\n"
                "layout(points) in;\n"
                "layout(line_strip, max_vertices=2) out;\n"
@@ -228,7 +233,7 @@ void render_output::initializeGL(void)
     if (!ngsh.compile())
         throw std::logic_error("Could not compile normal geometry shader");
 
-    dake::gl::shader fsh(dake::gl::shader::FRAGMENT);
+    shader fsh(shader::FRAGMENT);
     fsh.source("#version 150 core\n"
                "in vec3 gf_color;\n"
                "out vec4 out_color;\n"
@@ -240,7 +245,7 @@ void render_output::initializeGL(void)
         throw std::logic_error("Could not compile fragment shader");
 
 
-    prgs = new dake::gl::program[PROGRAM_COUNT];
+    prgs = new gl::program[PROGRAM_COUNT];
 
     for (int i = 0; i < PROGRAM_COUNT; i++) {
         switch (i & (LIGHTING | COLORED)) {
@@ -281,11 +286,11 @@ void render_output::resizeGL(int wdt, int hgt)
 
     glViewport(0, 0, w, h);
 
-    proj = dake::math::mat4::projection(fov, static_cast<float>(w) / h, .1f, 100.f);
+    proj = mat4::projection(fov, static_cast<float>(w) / h, .1f, 100.f);
 
-    dake::gl::program *cur = current_prg;
+    gl::program *cur = current_prg;
     for (int i = 0; i < PROGRAM_COUNT; i++)
-        prgs[i].uniform<dake::math::mat4>("proj") = proj;
+        prgs[i].uniform<mat4>("proj") = proj;
     if (cur)
         cur->use();
 }
@@ -300,23 +305,23 @@ void render_output::paintGL(void)
 
 
     for (auto c: cm.clouds()) {
-        dake::math::mat4 mv(this->mv * c.transformation());
-        dake::math::mat3 norm(mv);
+        mat4 mv(this->mv * c.transformation());
+        mat3 norm(mv);
         norm.transposed_invert();
 
-        dake::gl::program *prg = select_program(false);
-        prg->uniform<dake::math::mat4>("mv") = mv;
+        gl::program *prg = select_program(false);
+        prg->uniform<mat4>("mv") = mv;
         if (lighting && light_dir.length()) {
-            prg->uniform<dake::math::mat3>("nmat") = norm;
-            prg->uniform<dake::math::vec3>("light_dir") = light_dir.normalized();
+            prg->uniform<mat3>("nmat") = norm;
+            prg->uniform<vec3>("light_dir") = light_dir.normalized();
         }
 
         c.vertex_array()->draw(GL_POINTS);
 
 
         prg = select_program(true);
-        prg->uniform<dake::math::mat4>("mv") = mv;
-        prg->uniform<dake::math::mat3>("nmat") = norm;
+        prg->uniform<mat4>("mv") = mv;
+        prg->uniform<mat3>("nmat") = norm;
 
         c.vertex_array()->draw(GL_POINTS);
     }
@@ -358,10 +363,10 @@ void render_output::mouseReleaseEvent(QMouseEvent *evt)
 void render_output::mouseMoveEvent(QMouseEvent *evt)
 {
     if (rotate_camera) {
-        mv = dake::math::mat4::identity().rotated((rot_l_x - evt->x()) / 4.f * static_cast<float>(M_PI) / 180.f, dake::math::vec3(0.f, 1.f, 0.f)) * mv;
-        mv = dake::math::mat4::identity().rotated((rot_l_y - evt->y()) / 4.f * static_cast<float>(M_PI) / 180.f, dake::math::vec3(1.f, 0.f, 0.f)) * mv;
+        mv = mat4::identity().rotated((rot_l_x - evt->x()) / 4.f * static_cast<float>(M_PI) / 180.f, vec3(0.f, 1.f, 0.f)) * mv;
+        mv = mat4::identity().rotated((rot_l_y - evt->y()) / 4.f * static_cast<float>(M_PI) / 180.f, vec3(1.f, 0.f, 0.f)) * mv;
     } else {
-        mv = dake::math::mat4::identity().translated(dake::math::vec3((rot_l_x - evt->x()) / 100.f, (evt->y() - rot_l_y) / 100.f, 0.f)) * mv;
+        mv = mat4::identity().translated(vec3((rot_l_x - evt->x()) / 100.f, (evt->y() - rot_l_y) / 100.f, 0.f)) * mv;
     }
 
     rot_l_x = evt->x();
@@ -371,5 +376,5 @@ void render_output::mouseMoveEvent(QMouseEvent *evt)
 
 void render_output::wheelEvent(QWheelEvent *evt)
 {
-    mv = dake::math::mat4::identity().translated(dake::math::vec3(0.f, 0.f, evt->delta() / 360.f)) * mv;
+    mv = mat4::identity().translated(vec3(0.f, 0.f, evt->delta() / 360.f)) * mv;
 }

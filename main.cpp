@@ -4,17 +4,14 @@
 #include <fstream>
 #include <iostream>
 #include <libgen.h>
-#include <list>
+#include <memory>
 #include <QApplication>
-#include <dake/math/matrix.hpp>
-#include <dake/gl/shader.hpp>
 
 #include "cloud.hpp"
 #include "window.hpp"
 
 
 cloud_manager cm;
-window *wnd;
 
 
 int main(int argc, char *argv[])
@@ -37,7 +34,7 @@ int main(int argc, char *argv[])
         cm.load_new(inp, basename(name_copy));
     }
 
-    wnd = new window;
+    std::shared_ptr<window> wnd(new window);
     wnd->show();
 
     return app.exec();

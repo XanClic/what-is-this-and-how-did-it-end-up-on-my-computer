@@ -12,8 +12,12 @@
 #include "point.hpp"
 
 
+using namespace dake::math;
+using namespace dake::gl;
+
+
 cloud::cloud(const std::string &name):
-    trans(dake::math::mat4::identity()),
+    trans(mat4::identity()),
     n(name)
 {
 }
@@ -126,9 +130,9 @@ void cloud::load(std::ifstream &s)
         std::stringstream line_ss(line);
         point pt;
 
-        pt.position = dake::math::vec3::zero();
-        pt.normal   = dake::math::vec3::zero();
-        pt.color    = dake::math::vec3(1.f, 1.f, 1.f);
+        pt.position = vec3::zero();
+        pt.normal   = vec3::zero();
+        pt.color    = vec3(1.f, 1.f, 1.f);
 
         for (auto prop: properties) {
             float real_val;
@@ -198,7 +202,7 @@ void cloud::store(std::ofstream &s) const
 }
 
 
-dake::gl::vertex_array *cloud::vertex_array(void)
+vertex_array *cloud::vertex_array(void)
 {
     if (!varr || !varr_valid) {
         if (!varr)
@@ -207,9 +211,9 @@ dake::gl::vertex_array *cloud::vertex_array(void)
         varr->set_elements(p.size());
         varr->bind();
 
-        dake::gl::vertex_attrib *va_p = varr->attrib(0);
-        dake::gl::vertex_attrib *va_n = varr->attrib(1);
-        dake::gl::vertex_attrib *va_c = varr->attrib(2);
+        vertex_attrib *va_p = varr->attrib(0);
+        vertex_attrib *va_n = varr->attrib(1);
+        vertex_attrib *va_c = varr->attrib(2);
 
         va_p->format(3);
         va_n->format(3);
