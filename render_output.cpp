@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <cstring>
 #include <list>
 #include <stdexcept>
@@ -11,6 +12,7 @@
 
 #include "cloud.hpp"
 #include "render_output.hpp"
+#include "shader_sources.hpp"
 
 
 using namespace dake;
@@ -33,6 +35,17 @@ enum program_flags {
 
     PROGRAM_COUNT = 1 << PROGRAM_FLAG_COUNT
 };
+
+
+static int shader_flag_mask(shader::type t)
+{
+    switch (t) {
+        case shader::VERTEX:   return LIGHTING | COLORED;
+        case shader::GEOMETRY: return NORMALS;
+        case shader::FRAGMENT: return 0;
+        default:               throw std::invalid_argument("Invalid argument given to shader_flag_mask()");
+    }
+}
 
 
 render_output::render_output(QGLFormat fmt, QDoubleSpinBox *point_size_widget, QWidget *parent):
@@ -122,145 +135,34 @@ void render_output::initializeGL(void)
     psw->setMinimum(psr[0]);
     psw->setMaximum(psr[1]);
 
-    shader tvsh(shader::VERTEX);
-    tvsh.source("#version 150 core\n"
-                "in vec3 in_position;\n"
-                "in vec3 in_normal;\n"
-                "in vec3 in_color;\n"
-                "out vec3 vg_color;\n"
-                "out vec3 vg_normal;\n"
-                "uniform mat4 mv;\n"
-                "void main(void)\n"
-                "{\n"
-                "    gl_Position = mv * vec4(in_position, 1.0);\n"
-                "    vg_color = in_color;\n"
-                "    vg_normal = in_normal;\n"
-                "}");
-    if (!tvsh.compile())
-        throw std::logic_error("Could not compile trivial vertex shader");
 
-    shader lvsh(shader::VERTEX);
-    lvsh.source("#version 150 core\n"
-                "in vec3 in_position;\n"
-                "in vec3 in_normal;\n"
-                "in vec3 in_color;\n"
-                "out vec3 vg_color;\n"
-                "out vec3 vg_normal;\n"
-                "uniform mat4 mv;\n"
-                "uniform mat3 nmat;\n"
-                "uniform vec3 light_dir;\n"
-                "void main(void)\n"
-                "{\n"
-                "    gl_Position = mv * vec4(in_position, 1.0);\n"
-                "    vg_color = max(dot(nmat * in_normal, light_dir), 0.0) * in_color;\n"
-                "    vg_normal = in_normal;\n"
-                "}");
-    if (!lvsh.compile())
-        throw std::logic_error("Could not compile lighting vertex shader");
+    // (╯°□°）╯︵ ┻━┻
+    shader *shaders = static_cast<shader *>(malloc(shader_source_count * sizeof(shader)));
 
-    shader utvsh(shader::VERTEX);
-    utvsh.source("#version 150 core\n"
-                 "in vec3 in_position;\n"
-                 "in vec3 in_normal;\n"
-                 "out vec3 vg_color;\n"
-                 "out vec3 vg_normal;\n"
-                 "uniform mat4 mv;\n"
-                 "void main(void)\n"
-                 "{\n"
-                 "    gl_Position = mv * vec4(in_position, 1.0);\n"
-                 "    vg_color = vec3(1.0, 1.0, 1.0);\n"
-                 "    vg_normal = in_normal;\n"
-                 "}");
-    if (!utvsh.compile())
-        throw std::logic_error("Could not compile uncolored trivial vertex shader");
+    for (size_t i = 0; i < shader_source_count; i++) {
+        if (shader_sources[i].flags & ~shader_flag_mask(shader_sources[i])) {
+            throw std::logic_error(std::string("Invalid flags given for ") + shader_sources[i].description);
+        }
 
-    shader ulvsh(shader::VERTEX);
-    ulvsh.source("#version 150 core\n"
-                 "in vec3 in_position;\n"
-                 "in vec3 in_normal;\n"
-                 "out vec3 vg_color;\n"
-                 "out vec3 vg_normal;\n"
-                 "uniform mat4 mv;\n"
-                 "uniform mat3 nmat;\n"
-                 "uniform vec3 light_dir;\n"
-                 "void main(void)\n"
-                 "{\n"
-                 "    gl_Position = mv * vec4(in_position, 1.0);\n"
-                 "    vg_color = max(dot(nmat * in_normal, light_dir), 0.0) * vec3(1.0, 1.0, 1.0);\n"
-                 "    vg_normal = in_normal;\n"
-                 "}");
-    if (!ulvsh.compile())
-        throw std::logic_error("Could not compile uncolored lighting vertex shader");
-
-    shader tgsh(shader::GEOMETRY);
-    tgsh.source("#version 150 core\n"
-                "layout(points) in;\n"
-                "layout(points, max_vertices=1) out;\n"
-                "in vec3 vg_color[];\n"
-                "out vec3 gf_color;\n"
-                "uniform mat4 proj;\n"
-                "void main(void)\n"
-                "{\n"
-                "    gf_color = vg_color[0];\n"
-                "    gl_Position = proj * gl_in[0].gl_Position;\n"
-                "    EmitVertex();\n"
-                "    EndPrimitive();\n"
-                "}");
-    if (!tgsh.compile())
-        throw std::logic_error("Could not compile trivial geometry shader");
-
-    shader ngsh(shader::GEOMETRY);
-    ngsh.source("#version 150 core\n"
-               "layout(points) in;\n"
-               "layout(line_strip, max_vertices=2) out;\n"
-               "in vec3 vg_normal[];\n"
-               "out vec3 gf_color;\n"
-               "uniform mat4 proj;\n"
-               "uniform mat3 nmat;\n"
-               "uniform float normal_scale;\n"
-               "void main(void)\n"
-               "{\n"
-               "    gf_color = abs(vg_normal[0]);\n"
-               "    gl_Position = proj * gl_in[0].gl_Position;\n"
-               "    EmitVertex();\n"
-               "\n"
-               "    gf_color = abs(vg_normal[0]);\n"
-               "    gl_Position = proj * vec4(gl_in[0].gl_Position.xyz + normal_scale * (nmat * vg_normal[0]), 1.0);\n"
-               "    EmitVertex();\n"
-               "\n"
-               "    EndPrimitive();\n"
-               "}");
-    if (!ngsh.compile())
-        throw std::logic_error("Could not compile normal geometry shader");
-
-    shader fsh(shader::FRAGMENT);
-    fsh.source("#version 150 core\n"
-               "in vec3 gf_color;\n"
-               "out vec4 out_color;\n"
-               "void main(void)\n"
-               "{\n"
-               "    out_color = vec4(gf_color, 1.0);\n"
-               "}\n");
-    if (!fsh.compile())
-        throw std::logic_error("Could not compile fragment shader");
+        // I sure hope I'll burn for this
+        (new (&shaders[i]) shader(shader_sources[i]))->source(shader_sources[i]);
+        if (!shaders[i].compile()) {
+            throw std::logic_error(std::string("Failed to compile ") + shader_sources[i].description);
+        }
+    }
 
 
     prgs = new gl::program[PROGRAM_COUNT];
 
     for (int i = 0; i < PROGRAM_COUNT; i++) {
-        switch (i & (LIGHTING | COLORED)) {
-            case LIGHTING | COLORED: prgs[i] <<  lvsh; break;
-            case LIGHTING:           prgs[i] << ulvsh; break;
-            case COLORED:            prgs[i] <<  tvsh; break;
-            case 0:                  prgs[i] << utvsh; break;
-        };
-
-        switch (i & NORMALS) {
-            case NORMALS: prgs[i] << ngsh; break;
-            case 0:       prgs[i] << tgsh; break;
+        // Kind of FIXME, but probably not worth the trouble
+        for (size_t j = 0; j < shader_source_count; j++) {
+            if ((shader_sources[j].flags & shader_flag_mask(shader_sources[j])) ==
+                (i                       & shader_flag_mask(shader_sources[j])))
+            {
+                prgs[i] << shaders[j];
+            }
         }
-
-        prgs[i] << fsh;
 
         prgs[i].bind_attrib("in_position", 0);
         prgs[i].bind_attrib("in_normal", 1);
@@ -268,9 +170,16 @@ void render_output::initializeGL(void)
 
         prgs[i].bind_frag("out_color", 0);
 
-        if (!prgs[i].link())
+        if (!prgs[i].link()) {
             throw std::logic_error("Could not link program");
+        }
     }
+
+    // (๑′ᴗ'๑)ｴﾍﾍ
+    for (size_t i = 0; i < shader_source_count; i++) {
+        shaders[i].~shader();
+    }
+    free(shaders);
 
     prgs[0].use();
     current_prg = &prgs[0];
