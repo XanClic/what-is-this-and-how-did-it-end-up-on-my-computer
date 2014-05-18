@@ -74,11 +74,11 @@ class cloud {
 
             fesetround(round_mode);
 
-            for (auto cluster: clusters) {
+            for (const auto &cluster: clusters) {
                 point result(vec3::zero(), vec3::zero(), vec3::zero(), 0.f);
                 size_t cpc = cluster.second.size(); // cluster point count
 
-                for (auto p: cluster.second) {
+                for (const point &p: cluster.second) {
                     result.position += p.position / cpc;
                     result.normal   += p.normal;
                     result.color    += p.color    / cpc;
