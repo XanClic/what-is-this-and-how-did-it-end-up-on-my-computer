@@ -29,6 +29,6 @@ add_executable(cg2p1 main.cpp cloud.cpp window.cpp render_output.cpp shader_sour
 target_link_libraries(cg2p1 libdake.a ${OPENGL_LIBRARIES})
 add_dependencies(cg2p1 dake)
 
-set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -Wextra -DGL_GLEXT_PROTOTYPES")
+set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -g2 -Wall -Wextra -DGL_GLEXT_PROTOTYPES")
 
 qt5_use_modules(cg2p1 Core Gui OpenGL)
