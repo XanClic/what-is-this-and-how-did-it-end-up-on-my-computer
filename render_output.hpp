@@ -24,17 +24,17 @@ class render_output:
         bool lighting_enabled(void) const
         { return lighting; }
         void enable_lighting(bool enable)
-        { lighting = enable; }
+        { lighting = enable; reload_uniforms = true; }
 
         bool colors_enabled(void) const
         { return colored; }
         void enable_colors(bool enable)
-        { colored = enable; }
+        { colored = enable; reload_uniforms = true; }
 
         float normal_length(void) const
         { return normlen; }
         void set_normal_length(float len)
-        { normlen = len; }
+        { normlen = len; reload_uniforms = true; }
 
         const dake::math::mat4 &projection(void) const
         { return proj; }
@@ -44,12 +44,12 @@ class render_output:
         const dake::math::mat4 &modelview(void) const
         { return mv; }
         dake::math::mat4 &modelview(void)
-        { return mv; }
+        { reload_uniforms = true; return mv; }
 
         const dake::math::vec3 &light_direction(void) const
         { return light_dir; }
         dake::math::vec3 &light_direction(void)
-        { return light_dir; }
+        { reload_uniforms = true; return light_dir; }
 
     public slots:
         void change_point_size(double sz);
@@ -78,6 +78,7 @@ class render_output:
         dake::math::mat4 proj, mv;
         dake::math::vec3 light_dir;
         bool lighting = false, colored = true, rotate_camera = false, move_camera = false;
+        bool reload_uniforms = true;
         float normlen = 0.f;
         float rot_l_x, rot_l_y;
         float fov = static_cast<float>(M_PI) / 4.f;

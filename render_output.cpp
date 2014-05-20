@@ -75,9 +75,6 @@ gl::program *render_output::select_program(bool normals)
 
     if (selected != current_prg) {
         selected->use();
-
-        if (normals)
-            selected->uniform<float>("normal_scale") = normlen;
     }
 
     return current_prg = selected;
@@ -181,9 +178,6 @@ void render_output::initializeGL(void)
     }
     free(shaders);
 
-    prgs[0].use();
-    current_prg = &prgs[0];
-
     redraw_timer->start(0);
 }
 
@@ -213,27 +207,44 @@ void render_output::paintGL(void)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
+    mat4 mv;
+    mat3 norm;
+
     for (cloud &c: cm.clouds()) {
-        mat4 mv(this->mv * c.transformation());
-        mat3 norm(mv);
-        norm.transposed_invert();
+        if (reload_uniforms) {
+            mv = this->mv * c.transformation();
+            norm = mv;
+            norm.transposed_invert();
+        }
 
         gl::program *prg = select_program(false);
-        prg->uniform<mat4>("mv") = mv;
-        if (lighting && light_dir.length()) {
-            prg->uniform<mat3>("nmat") = norm;
-            prg->uniform<vec3>("light_dir") = light_dir.normalized();
+        if (reload_uniforms) {
+            prg->uniform<mat4>("mv") = mv;
+            if (lighting && light_dir.length()) {
+                prg->uniform<mat3>("nmat") = norm;
+                prg->uniform<vec3>("light_dir") = light_dir.normalized();
+            }
         }
 
         c.vertex_array()->draw(GL_POINTS);
 
 
-        prg = select_program(true);
-        prg->uniform<mat4>("mv") = mv;
-        prg->uniform<mat3>("nmat") = norm;
+        if (normlen) {
+            prg = select_program(true);
+            if (reload_uniforms) {
+                prg->uniform<mat4>("mv") = mv;
+                prg->uniform<mat3>("nmat") = norm;
+                prg->uniform<float>("normal_scale") = normlen;
+            }
 
-        c.vertex_array()->draw(GL_POINTS);
+            c.vertex_array()->draw(GL_POINTS);
+        }
     }
+
+    reload_uniforms = false;
+
+    gl::program::unuse();
+    current_prg = nullptr;
 }
 
 
@@ -278,6 +289,8 @@ void render_output::mouseMoveEvent(QMouseEvent *evt)
         mv = mat4::identity().translated(vec3((rot_l_x - evt->x()) / 100.f, (evt->y() - rot_l_y) / 100.f, 0.f)) * mv;
     }
 
+    reload_uniforms = true;
+
     rot_l_x = evt->x();
     rot_l_y = evt->y();
 }
@@ -286,4 +299,6 @@ void render_output::mouseMoveEvent(QMouseEvent *evt)
 void render_output::wheelEvent(QWheelEvent *evt)
 {
     mv = mat4::identity().translated(vec3(0.f, 0.f, evt->delta() / 360.f)) * mv;
+
+    reload_uniforms = true;
 }
