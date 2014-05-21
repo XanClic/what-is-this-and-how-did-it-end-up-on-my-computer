@@ -7,20 +7,26 @@
 // Who needs other dimensions anyway
 template<> void kd_tree_node<3>::dump(unsigned level_indentation, unsigned indentation) const
 {
-    if (leaf()) {
+    if (!pt) {
         printf("%*s%p\n", indentation, "", this);
     } else {
-        printf("%*s%p (dim %i, split %f)\n", indentation, "", this, split_dim, split_val);
+        printf("%*s%p (dim %i, split (%f; %f; %f))\n", indentation, "", this, split_dim, pt->position.x(), pt->position.y(), pt->position.z());
     }
     indentation += level_indentation;
 
     if (leaf()) {
-        for (const point *pt: *this) {
-            printf("%*s(%f; %f; %f)\n", indentation, "", pt->position.x(), pt->position.y(), pt->position.z());
+        if (!pt) {
+            for (const point *ptl: *this) {
+                printf("%*s(%f; %f; %f)\n", indentation, "", ptl->position.x(), ptl->position.y(), ptl->position.z());
+            }
         }
     } else {
-        left_child ->dump(level_indentation, indentation);
-        right_child->dump(level_indentation, indentation);
+        if (left_child) {
+            left_child ->dump(level_indentation, indentation);
+        }
+        if (right_child) {
+            right_child->dump(level_indentation, indentation);
+        }
     }
 }
 

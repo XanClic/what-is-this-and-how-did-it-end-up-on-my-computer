@@ -35,6 +35,9 @@ class kd_tree_node {
             std::advance(end_it, end);
 
             if ((end - start < min_points * 2) || !max_depth) {
+                if (end - start == 1) {
+                    pt = *start_it;
+                }
                 return;
             }
 
@@ -69,22 +72,36 @@ class kd_tree_node {
             // Calculate the median
             std::sort(start_it, end_it, [&](const point *a, const point *b) { return a->position[split_dim] < b->position[split_dim]; });
 
-            if ((end - start) % 2) {
-                split_val = points[start + (end - start - 1) / 2]->position[split_dim];
-            } else {
-                split_val = .5f * (points[start + (end - start) / 2]->position[split_dim] + points[start + (end - start) / 2 + 1]->position[split_dim]);
+            // This is correct for odd (start - end) and for even (start - end)
+            // we have the choice between this and the previous element. We have
+            // to choose one, so just take this.
+            unsigned median_index = (start + end) / 2;
+            float median = points[median_index]->position[split_dim];
+
+            // Increase median_index until it points to an element with a
+            // different (= higher) value so we can then sort all elements with
+            // .position[split_dim] <= median into the left tree
+            for (;
+                 (median_index < end) &&
+                 (points[median_index]->position[split_dim] <= median);
+                 median_index++);
+
+            // For the first to occur, min_points needs to be zero. For the
+            // second to occur, there need to be multiple points with the same
+            // .position[split_dim] value as the median, which would be really
+            // bad (but may very well occur). To fix this, we'd have to either
+            // try a different split_dim, or even better, reduce the
+            // median_index until it works. Both are against the task given, so
+            // I won't do it and just chicken out here.
+            assert((median_index > start) && ((end - start == 2) || (median_index < end)));
+
+            pt = points[--median_index];
+
+            left_child  = new kd_tree_node<K>(points, start, median_index, max_depth - 1, min_points);
+
+            if (end - start > 2) {
+                right_child = new kd_tree_node<K>(points, median_index + 1, end, max_depth - 1, min_points);
             }
-
-            unsigned first_exceeding_median;
-            for (first_exceeding_median = start;
-                 (first_exceeding_median < end) &&
-                 (points[first_exceeding_median]->position[split_dim] <= split_val);
-                 first_exceeding_median++);
-
-            assert((first_exceeding_median > start) && (first_exceeding_median < end));
-
-            left_child  = new kd_tree_node<K>(points, start, first_exceeding_median, max_depth - 1, min_points);
-            right_child = new kd_tree_node<K>(points,  first_exceeding_median, end,  max_depth - 1, min_points);
         }
 
         ~kd_tree_node(void)
@@ -93,10 +110,10 @@ class kd_tree_node {
             delete right_child;
         }
 
-        // All points p here meet the constraint p.position[split_dimension()] <= split_value()
+        // All points p here meet the constraint p.position[split_dimension()] <= split_point()[split_dimension()]
         kd_tree_node *left(void) const
         { return left_child; }
-        // All points p here meet the constraint p.position[split_dimension()] >  split_value()
+        // All points p here meet the constraint p.position[split_dimension()] >  split_point()[split_dimension()]
         kd_tree_node *right(void) const
         { return right_child; }
 
@@ -115,17 +132,17 @@ class kd_tree_node {
 
         int split_dimension(void) const
         { return split_dim; }
-        float split_value(void) const
-        { return split_val; }
+        const point *split_point(void) const
+        { return pt; }
 
         void dump(unsigned level_indentation = 2, unsigned indentation = 0) const;
 
 
     private:
+        const point *pt = nullptr;
         iterator start_it, end_it;
         kd_tree_node *left_child = nullptr, *right_child = nullptr;
         int split_dim = -1;
-        float split_val = 0.f;
 
         typedef dake::math::vec<K, float> vector;
 };
@@ -134,7 +151,7 @@ class kd_tree_node {
 template<unsigned K>
 class kd_tree {
     public:
-        kd_tree(const cloud &c, unsigned max_depth = 10, unsigned min_points = 10)
+        kd_tree(const cloud &c, unsigned max_depth = UINT_MAX, unsigned min_points = 1)
         {
             point_references.reserve(c.points().size());
 
