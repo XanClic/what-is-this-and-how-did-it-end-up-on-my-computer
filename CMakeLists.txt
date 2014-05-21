@@ -12,7 +12,7 @@ find_package(Qt5 REQUIRED COMPONENTS Core Gui OpenGL)
 ExternalProject_Add(
     dake
     GIT_REPOSITORY git://github.com/XanClic/dake.git
-    GIT_TAG master
+    GIT_TAG origin/master
     SOURCE_DIR dake
     CMAKE_COMMAND true
     BUILD_COMMAND make -j 4
