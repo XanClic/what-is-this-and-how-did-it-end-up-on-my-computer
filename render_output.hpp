@@ -51,6 +51,8 @@ class render_output:
         dake::math::vec3 &light_direction(void)
         { reload_uniforms = true; return light_dir; }
 
+        void invalidate(void);
+
     public slots:
         void change_point_size(double sz);
         void change_point_smoothness(int smooth);

@@ -86,6 +86,12 @@ gl::program *render_output::select_program(bool normals)
 }
 
 
+void render_output::invalidate(void)
+{
+    reload_uniforms = true;
+}
+
+
 void render_output::change_point_size(double sz)
 {
     glPointSize(sz);
