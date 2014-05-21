@@ -289,6 +289,8 @@ void window::do_unify(void)
         // do you feel the suffering
         clouds->addItem(c.name().c_str(), static_cast<qulonglong>(reinterpret_cast<uintptr_t>(const_cast<cloud *>(&c))));
     }
+
+    gl->invalidate();
 }
 
 
@@ -320,6 +322,8 @@ void window::load_cloud(void)
         // let it cleanse your sins
         clouds->addItem(c.name().c_str(), static_cast<qulonglong>(reinterpret_cast<uintptr_t>(const_cast<cloud *>(&c))));
     }
+
+    gl->invalidate();
 }
 
 
