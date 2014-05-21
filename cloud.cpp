@@ -5,11 +5,13 @@
 #include <stdexcept>
 #include <sstream>
 #include <string>
+#include <vector>
 #include <dake/math/matrix.hpp>
 #include <dake/gl/vertex_array.hpp>
 #include <dake/gl/vertex_attrib.hpp>
 
 #include "cloud.hpp"
+#include "kd_tree.hpp"
 #include "point.hpp"
 
 
@@ -27,6 +29,7 @@ cloud::cloud(const std::string &name):
 cloud::~cloud(void)
 {
     delete varr;
+    delete rng_varr;
 }
 
 
@@ -236,6 +239,42 @@ vertex_array *cloud::vertex_array(void)
     }
 
     return varr;
+}
+
+
+vertex_array *cloud::rng_vertex_array(int k)
+{
+    if (!rng_varr || !rng_varr_valid || (k != rng_k)) {
+        if (!rng_varr) {
+            rng_varr = new dake::gl::vertex_array;
+        }
+
+        // Because I'm lazy
+        std::vector<vec3> lines;
+        kd_tree<3> kdt(*this, INT_MAX, 10);
+
+        for (const point &pt: p) {
+            std::vector<const point *> knn = kdt.knn(pt.position, k);
+
+            for (const point *nn: knn) {
+                lines.push_back(pt.position);
+                lines.push_back(nn->position);
+            }
+        }
+
+        rng_varr->set_elements(lines.size());
+        rng_varr->bind();
+
+        vertex_attrib *va_p = rng_varr->attrib(0);
+        va_p->format(3);
+        va_p->data(lines.data());
+        va_p->load();
+
+        rng_k = k;
+        rng_varr_valid = true;
+    }
+
+    return rng_varr;
 }
 
 

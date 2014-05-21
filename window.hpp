@@ -36,13 +36,14 @@ class window:
         render_output *gl;
         QHBoxLayout *l1, *ldl;
         QVBoxLayout *l2;
-        QFrame *f[4];
-        QCheckBox *smooth_points, *lighting, *colored;
+        QFrame *f[5];
+        QCheckBox *smooth_points, *lighting, *colored, *rng;
         QDoubleSpinBox *point_size, *normal_length, *fov, *ld_x, *ld_y, *ld_z;
-        QLabel *point_size_label, *normal_length_label, *fov_label, *ld;
+        QLabel *point_size_label, *normal_length_label, *fov_label, *ld, *rng_k_label;
         QPushButton *unify, *load, *store;
         QDoubleSpinBox *unify_res;
         QComboBox *clouds;
+        QSpinBox *rng_k;
 };
 
 #endif
