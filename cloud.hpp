@@ -33,10 +33,14 @@ template<> struct hash<dake::math::vec3i> {
 
     value_type operator()(const argument_type &v) const
     {
-        return static_cast<value_type>(v.x()) * P1
-             + static_cast<value_type>(v.y()) * P2
-             + static_cast<value_type>(v.z()) * P3;
+        return value_hash(static_cast<value_type>(v.x()) * P1
+                        + static_cast<value_type>(v.y()) * P2
+                        + static_cast<value_type>(v.z()) * P3);
     }
+
+
+    private:
+        std::hash<value_type> value_hash;
 };
 
 }
