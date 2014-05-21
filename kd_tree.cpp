@@ -5,9 +5,13 @@
 
 
 // Who needs other dimensions anyway
-template<> void kd_tree<3>::dump(unsigned level_indentation, unsigned indentation) const
+template<> void kd_tree_node<3>::dump(unsigned level_indentation, unsigned indentation) const
 {
-    printf("%*s%p\n", indentation, "", this);
+    if (leaf()) {
+        printf("%*s%p\n", indentation, "", this);
+    } else {
+        printf("%*s%p (dim %i, split %f)\n", indentation, "", this, split_dim, split_val);
+    }
     indentation += level_indentation;
 
     if (leaf()) {
@@ -18,4 +22,10 @@ template<> void kd_tree<3>::dump(unsigned level_indentation, unsigned indentatio
         left_child ->dump(level_indentation, indentation);
         right_child->dump(level_indentation, indentation);
     }
+}
+
+
+template<> void kd_tree<3>::dump(unsigned level_indentation, unsigned indentation) const
+{
+    root_node->dump(level_indentation, indentation);
 }
