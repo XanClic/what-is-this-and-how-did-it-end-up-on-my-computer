@@ -116,7 +116,7 @@ class cloud {
         { return trans; }
 
         dake::gl::vertex_array *vertex_array(void);
-        dake::gl::vertex_array *normal_vertex_array(void);
+        dake::gl::vertex_array *rng_vertex_array(int k);
 
         const std::string &name(void) const
         { return n; }
@@ -127,8 +127,9 @@ class cloud {
     private:
         std::vector<point> p;
         dake::math::mat4 trans;
-        dake::gl::vertex_array *varr = nullptr;
-        bool varr_valid = false;
+        dake::gl::vertex_array *varr = nullptr, *rng_varr = nullptr;
+        bool varr_valid = false, rng_varr_valid = false;
+        int rng_k = -1;
         std::string n;
 
         struct point_counter: public point {

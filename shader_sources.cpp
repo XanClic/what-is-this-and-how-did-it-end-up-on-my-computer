@@ -21,7 +21,13 @@ enum program_flags {
     NORMALS  = 1 << BIT_NORMALS,
     COLORED  = 1 << BIT_COLORED,
 
-    PROGRAM_COUNT = 1 << PROGRAM_FLAG_COUNT
+    PROGRAM_COUNT = 1 << PROGRAM_FLAG_COUNT,
+
+    // Not-really-flags™ (may not be used with any other flags but only given
+    // alone)
+
+    // Riemann's Neighborhood Graph
+    RNG      = 1 << PROGRAM_FLAG_COUNT,
 };
 
 
@@ -108,6 +114,20 @@ const shader_source shader_sources[] = {
                   "colored lighting vertex shader"),
 
 
+    shader_source(shader::VERTEX,
+
+                  "#version 150 core\n"
+                  "in vec3 in_position;\n"
+                  "uniform mat4 mv, proj;\n"
+                  "void main(void)\n"
+                  "{\n"
+                  "    gl_Position = proj * mv * vec4(in_position, 1.0);\n"
+                  "}",
+
+                  RNG,
+                  "RNG vertex shader"),
+
+
     shader_source(shader::GEOMETRY,
 
                   "#version 150 core\n"
@@ -163,10 +183,23 @@ const shader_source shader_sources[] = {
                   "void main(void)\n"
                   "{\n"
                   "    out_color = vec4(gf_color, 1.0);\n"
-                  "}\n",
+                  "}",
 
                   0,
                   "fragment shader"),
+
+
+    shader_source(shader::FRAGMENT,
+
+                  "#version 150 core\n"
+                  "out vec4 out_color;\n"
+                  "void main(void)\n"
+                  "{\n"
+                  "    out_color = vec4(1.0, 0.25, 0.0, 1.0);\n"
+                  "}",
+
+                  RNG,
+                  "RNG fragment shader"),
 };
 
 

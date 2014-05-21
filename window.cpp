@@ -161,6 +161,11 @@ window::window(void):
     fov = new QDoubleSpinBox;
     fov->setValue(45.);
     fov->setRange(.01, 179.99);
+    rng = new QCheckBox("Do the Riemann");
+    rng_k_label = new QLabel("k (neighbor count):");
+    rng_k = new QSpinBox;
+    rng_k->setRange(1, INT_MAX);
+    rng_k->setValue(5);
 
     for (QFrame *&fr: f) {
         fr = new QFrame;
@@ -193,6 +198,10 @@ window::window(void):
     l2->addWidget(f[3]);
     l2->addWidget(fov_label);
     l2->addWidget(fov);
+    l2->addWidget(f[4]);
+    l2->addWidget(rng);
+    l2->addWidget(rng_k_label);
+    l2->addWidget(rng_k);
     l2->addStretch();
 
     int highest = fls(QGLFormat::openGLVersionFlags());
@@ -221,6 +230,8 @@ window::window(void):
     connect(ld_z, SIGNAL(valueChanged(double)), gl, SLOT(change_ld_z(double)));
     connect(normal_length, SIGNAL(valueChanged(double)), gl, SLOT(change_normal_length(double)));
     connect(fov, SIGNAL(valueChanged(double)), gl, SLOT(change_fov(double)));
+    connect(rng, SIGNAL(stateChanged(int)), gl, SLOT(toggle_rng(int)));
+    connect(rng_k, SIGNAL(valueChanged(int)), gl, SLOT(set_rng_k(int)));
 
     connect(unify, SIGNAL(pressed()), this, SLOT(do_unify()));
     connect(load, SIGNAL(pressed()), this, SLOT(load_cloud()));
@@ -239,6 +250,9 @@ window::~window(void)
     delete l2;
     delete ldl;
     delete gl;
+    delete rng_k;
+    delete rng_k_label;
+    delete rng;
     delete fov;
     delete fov_label;
     delete normal_length;

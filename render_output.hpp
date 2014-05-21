@@ -61,6 +61,8 @@ class render_output:
         void change_ld_x(double ld_x) { light_direction().x() = ld_x; }
         void change_ld_y(double ld_y) { light_direction().y() = ld_y; }
         void change_ld_z(double ld_z) { light_direction().z() = ld_z; }
+        void toggle_rng(int state) { reload_uniforms = true; show_rng = state; }
+        void set_rng_k(int k) { reload_uniforms = true; rng_k = k; }
 
     protected:
         void initializeGL(void);
@@ -73,7 +75,7 @@ class render_output:
 
     private:
         QDoubleSpinBox *psw;
-        dake::gl::program *prgs = nullptr, *current_prg = nullptr;
+        dake::gl::program *prgs = nullptr, *current_prg = nullptr, *rng_prg = nullptr;
         QTimer *redraw_timer;
         dake::math::mat4 proj, mv;
         dake::math::vec3 light_dir;
@@ -83,8 +85,10 @@ class render_output:
         float rot_l_x, rot_l_y;
         float fov = static_cast<float>(M_PI) / 4.f;
         int w, h;
+        bool show_rng = false;
+        int rng_k = 5;
 
-        void recalc_projection(float aspect, float fov);
+        void recalc_rng(void);
 };
 
 #endif

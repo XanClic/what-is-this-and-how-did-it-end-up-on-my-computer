@@ -1,6 +1,5 @@
 #include <cstdlib>
 #include <cstring>
-#include <list>
 #include <stdexcept>
 #include <QtOpenGL>
 #include <QDoubleSpinBox>
@@ -33,7 +32,13 @@ enum program_flags {
     NORMALS  = 1 << BIT_NORMALS,
     COLORED  = 1 << BIT_COLORED,
 
-    PROGRAM_COUNT = 1 << PROGRAM_FLAG_COUNT
+    PROGRAM_COUNT = 1 << PROGRAM_FLAG_COUNT,
+
+    // Not-really-flags™ (may not be used with any other flags but only given
+    // alone)
+
+    // Riemann's Neighborhood Graph
+    RNG      = 1 << PROGRAM_FLAG_COUNT,
 };
 
 
@@ -137,7 +142,7 @@ void render_output::initializeGL(void)
     shader *shaders = static_cast<shader *>(malloc(shader_source_count * sizeof(shader)));
 
     for (size_t i = 0; i < shader_source_count; i++) {
-        if (shader_sources[i].flags & ~shader_flag_mask(shader_sources[i])) {
+        if ((shader_sources[i].flags < PROGRAM_COUNT) && (shader_sources[i].flags & ~shader_flag_mask(shader_sources[i]))) {
             throw std::logic_error(std::string("Invalid flags given for ") + shader_sources[i].description);
         }
 
@@ -154,8 +159,9 @@ void render_output::initializeGL(void)
     for (int i = 0; i < PROGRAM_COUNT; i++) {
         // Kind of FIXME, but probably not worth the trouble
         for (size_t j = 0; j < shader_source_count; j++) {
-            if ((shader_sources[j].flags & shader_flag_mask(shader_sources[j])) ==
-                (i                       & shader_flag_mask(shader_sources[j])))
+            if ((shader_sources[j].flags < PROGRAM_COUNT) &&
+               ((shader_sources[j].flags & shader_flag_mask(shader_sources[j])) ==
+                (i                       & shader_flag_mask(shader_sources[j]))))
             {
                 prgs[i] << shaders[j];
             }
@@ -170,6 +176,19 @@ void render_output::initializeGL(void)
         if (!prgs[i].link()) {
             throw std::logic_error("Could not link program");
         }
+    }
+
+    rng_prg = new gl::program;
+    for (size_t i = 0; i < shader_source_count; i++) {
+        if (shader_sources[i].flags == RNG) {
+            *rng_prg << shaders[i];
+        }
+    }
+    rng_prg->bind_attrib("in_position", 0);
+    rng_prg->bind_frag("out_color", 0);
+
+    if (!rng_prg->link()) {
+        throw std::logic_error("Could not compile RNG program");
     }
 
     // (๑′ᴗ'๑)ｴﾍﾍ
@@ -192,10 +211,15 @@ void render_output::resizeGL(int wdt, int hgt)
     proj = mat4::projection(fov, static_cast<float>(w) / h, .1f, 100.f);
 
     gl::program *cur = current_prg;
-    for (int i = 0; i < PROGRAM_COUNT; i++)
+
+    for (int i = 0; i < PROGRAM_COUNT; i++) {
         prgs[i].uniform<mat4>("proj") = proj;
-    if (cur)
+    }
+    rng_prg->uniform<mat4>("proj") = proj;
+
+    if (cur) {
         cur->use();
+    }
 }
 
 
@@ -210,19 +234,23 @@ void render_output::paintGL(void)
     mat4 mv;
     mat3 norm;
 
+    bool multicloud = cm.clouds().size() > 1;
+
     for (cloud &c: cm.clouds()) {
-        if (reload_uniforms) {
+        if (reload_uniforms || multicloud) {
             mv = this->mv * c.transformation();
             norm = mv;
             norm.transposed_invert();
         }
 
         gl::program *prg = select_program(false);
-        if (reload_uniforms) {
+        if (reload_uniforms || multicloud) {
             prg->uniform<mat4>("mv") = mv;
             if (lighting && light_dir.length()) {
                 prg->uniform<mat3>("nmat") = norm;
-                prg->uniform<vec3>("light_dir") = light_dir.normalized();
+                if (reload_uniforms) {
+                    prg->uniform<vec3>("light_dir") = light_dir.normalized();
+                }
             }
         }
 
@@ -231,13 +259,24 @@ void render_output::paintGL(void)
 
         if (normlen) {
             prg = select_program(true);
-            if (reload_uniforms) {
+            if (reload_uniforms || multicloud) {
                 prg->uniform<mat4>("mv") = mv;
                 prg->uniform<mat3>("nmat") = norm;
-                prg->uniform<float>("normal_scale") = normlen;
+                if (reload_uniforms) {
+                    prg->uniform<float>("normal_scale") = normlen;
+                }
             }
 
             c.vertex_array()->draw(GL_POINTS);
+        }
+
+        if (show_rng) {
+            rng_prg->use();
+            if (reload_uniforms || multicloud) {
+                rng_prg->uniform<mat4>("mv") = mv;
+            }
+
+            c.rng_vertex_array(rng_k)->draw(GL_LINES);
         }
     }
 
