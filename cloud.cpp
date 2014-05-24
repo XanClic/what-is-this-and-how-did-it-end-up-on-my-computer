@@ -172,7 +172,7 @@ void cloud::load(std::ifstream &s)
     if (vertices >= 0)
         throw std::invalid_argument("Unexpected EOF");
 
-    varr_valid = false;
+    varr_valid = rng_varr_valid = density_valid = false;
 }
 
 
@@ -278,11 +278,44 @@ vertex_array *cloud::rng_vertex_array(int k)
 }
 
 
+void cloud::cull_outliers(float cull_ratio, int k)
+{
+    assert((cull_ratio >= 0) && (cull_ratio <= 1));
+
+    if (!density_valid) {
+        recalc_density(k);
+        density_valid = true;
+    }
+
+    // Sort descending regarding the density
+    std::sort(p.begin(), p.end(), [](const point &p1, const point &p2) { return p1.density > p2.density; });
+
+    p.resize(lrint(p.size() * (1.f - cull_ratio)));
+
+    varr_valid = rng_varr_valid = density_valid = false;
+}
+
+
+void cloud::recalc_density(int k)
+{
+    kd_tree<3> kdt(*this, INT_MAX, 10);
+
+    for (point &pt: p) {
+        std::vector<const point *> knn = kdt.knn(pt.position, k);
+
+        // The vector is ordered with the neighbor the most distant being last
+        float r = (knn.back()->position - pt.position).length();
+
+        pt.density = k / (static_cast<float>(M_PI) * r * r);
+    }
+}
+
+
 void cloud_manager::unify(float resolution, const std::string &name)
 {
     cloud unified(*c, resolution, name);
 
     delete c;
     c = new std::list<cloud>;
-    c->push_back(std::move(unified));
+    c->push_back(unified);
 }
