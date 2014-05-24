@@ -1,6 +1,8 @@
 #ifndef RENDER_OUTPUT_HPP
 #define RENDER_OUTPUT_HPP
 
+#include <dake/gl/gl.hpp>
+
 #include <QGLWidget>
 #include <QDoubleSpinBox>
 #include <QTimer>

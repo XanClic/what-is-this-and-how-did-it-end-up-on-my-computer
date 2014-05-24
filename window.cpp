@@ -1,3 +1,5 @@
+#include <dake/gl/gl.hpp>
+
 #include <cerrno>
 #include <cmath>
 #include <cstring>
@@ -7,10 +9,13 @@
 #include <QBoxLayout>
 #include <QWidget>
 #include <QDoubleSpinBox>
+#include <QSpinBox>
 #include <QLabel>
 #include <QPushButton>
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QFrame>
+#include <QComboBox>
 
 #include "cloud.hpp"
 #include "render_output.hpp"

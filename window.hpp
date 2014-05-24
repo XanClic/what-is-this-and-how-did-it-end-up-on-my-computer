@@ -6,9 +6,11 @@
 #include <QCheckBox>
 #include <QWidget>
 #include <QDoubleSpinBox>
+#include <QSpinBox>
 #include <QLabel>
 #include <QPushButton>
 #include <QFrame>
+#include <QComboBox>
 
 #include "render_output.hpp"
 
