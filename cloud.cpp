@@ -17,6 +17,11 @@
 #include "point.hpp"
 
 
+#ifndef M_PI
+#define M_PI 3.141592
+#endif
+
+
 using namespace dake::math;
 using namespace dake::gl;
 

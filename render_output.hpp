@@ -3,6 +3,7 @@
 
 #include <dake/gl/gl.hpp>
 
+#include <cmath>
 #include <QGLWidget>
 #include <QDoubleSpinBox>
 #include <QTimer>
@@ -10,6 +11,11 @@
 #include <QWheelEvent>
 #include <dake/math/matrix.hpp>
 #include <dake/gl/shader.hpp>
+
+
+#ifndef M_PI
+#define M_PI 3.141592
+#endif
 
 
 class render_output:
