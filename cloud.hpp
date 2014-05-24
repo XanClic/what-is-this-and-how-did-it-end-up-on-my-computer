@@ -20,6 +20,33 @@
 #include "point.hpp"
 
 
+#ifndef FE_DOWNWARD
+#include <cstdint>
+
+#define FE_TONEAREST  0x0000
+#define FE_DOWNWARD   0x0400
+#define FE_UPWARD     0x0800
+#define FE_TOWARDZERO 0x0c00
+
+static inline int fesetround(int mode)
+{
+    uint16_t cw;
+    __asm__ __volatile__ ("fnstcw %0" : "=m"(cw));
+    cw &= ~(FE_TONEAREST | FE_DOWNWARD | FE_UPWARD | FE_TOWARDZERO);
+    cw |= mode;
+    __asm__ __volatile__ ("fldcw %0" :: "m"(cw));
+    return 0;
+}
+
+static inline int fegetround(void)
+{
+    uint16_t cw;
+    __asm__ __volatile__ ("fnstcw %0" : "=m"(cw));
+    return cw & (FE_TONEAREST | FE_DOWNWARD | FE_UPWARD | FE_TOWARDZERO);
+}
+#endif
+
+
 namespace std
 {
 
