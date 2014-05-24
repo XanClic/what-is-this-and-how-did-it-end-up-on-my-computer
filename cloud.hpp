@@ -124,11 +124,14 @@ class cloud {
         { return n; }
 
 
+        void cull_outliers(float cull_ratio, int k = 10);
+
+
     private:
         std::vector<point> p;
         dake::math::mat4 trans;
         dake::gl::vertex_array *varr = nullptr, *rng_varr = nullptr;
-        bool varr_valid = false, rng_varr_valid = false;
+        bool varr_valid = false, rng_varr_valid = false, density_valid = false;
         int rng_k = -1;
         std::string n;
 
@@ -136,6 +139,8 @@ class cloud {
             point_counter(dake::math::vec3 p, dake::math::vec3 n, dake::math::vec3 c, float d): point(p, n, c, d), count(1) {}
             size_t count;
         };
+
+        void recalc_density(int k);
 };
 
 

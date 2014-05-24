@@ -159,13 +159,18 @@ window::window(void):
     normal_length->setRange(-HUGE_VAL, HUGE_VAL);
     fov_label = new QLabel("FOV:");
     fov = new QDoubleSpinBox;
-    fov->setValue(45.);
     fov->setRange(.01, 179.99);
-    rng = new QCheckBox("Do the Riemann");
+    fov->setValue(45.);
+    rng = new QCheckBox("Riemann misete");
     rng_k_label = new QLabel("k (neighbor count):");
     rng_k = new QSpinBox;
     rng_k->setRange(1, INT_MAX);
     rng_k->setValue(5);
+    cull = new QPushButton("Cull outliers");
+    cull_ratio_label = new QLabel("Percentage to cull:");
+    cull_ratio = new QDoubleSpinBox;
+    cull_ratio->setRange(0., 100.);
+    cull_ratio->setValue(10.);
 
     for (QFrame *&fr: f) {
         fr = new QFrame;
@@ -202,6 +207,9 @@ window::window(void):
     l2->addWidget(rng);
     l2->addWidget(rng_k_label);
     l2->addWidget(rng_k);
+    l2->addWidget(cull);
+    l2->addWidget(cull_ratio_label);
+    l2->addWidget(cull_ratio);
     l2->addStretch();
 
     int highest = fls(QGLFormat::openGLVersionFlags());
@@ -236,6 +244,7 @@ window::window(void):
     connect(unify, SIGNAL(pressed()), this, SLOT(do_unify()));
     connect(load, SIGNAL(pressed()), this, SLOT(load_cloud()));
     connect(store, SIGNAL(pressed()), this, SLOT(store_cloud()));
+    connect(cull, SIGNAL(pressed()), this, SLOT(do_cull()));
 
     l1 = new QHBoxLayout;
     l1->addWidget(gl, 1);
@@ -250,6 +259,9 @@ window::~window(void)
     delete l2;
     delete ldl;
     delete gl;
+    delete cull_ratio;
+    delete cull_ratio_label;
+    delete cull;
     delete rng_k;
     delete rng_k_label;
     delete rng;
@@ -346,4 +358,17 @@ void window::store_cloud(void)
     reinterpret_cast<const cloud *>(static_cast<uintptr_t>(clouds->currentData().value<qulonglong>()))->store(out);
 
     // accept jesus
+}
+
+
+void window::do_cull(void)
+{
+    float ratio = static_cast<float>(cull_ratio->value()) / 100.f;
+    int k = rng_k->value();
+
+    for (cloud &c: cm.clouds()) {
+        c.cull_outliers(ratio, k);
+    }
+
+    gl->invalidate();
 }
