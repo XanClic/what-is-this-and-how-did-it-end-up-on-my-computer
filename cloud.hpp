@@ -1,6 +1,8 @@
 #ifndef CLOUD_HPP
 #define CLOUD_HPP
 
+#include <dake/gl/gl.hpp>
+
 #include <cfenv>
 #include <cmath>
 #include <cstddef>

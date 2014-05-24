@@ -1,3 +1,5 @@
+#include <dake/gl/gl.hpp>
+
 #include <cmath>
 #include <iostream>
 #include <fstream>

@@ -1,7 +1,9 @@
+#include <dake/gl/gl.hpp>
+
 #include <cstdlib>
 #include <cstring>
 #include <stdexcept>
-#include <QtOpenGL>
+#include <QGLWidget>
 #include <QDoubleSpinBox>
 #include <QTimer>
 #include <QMouseEvent>
@@ -126,6 +128,8 @@ void render_output::change_fov(double fov_deg)
 
 void render_output::initializeGL(void)
 {
+    gl::glext_init();
+
     int maj, min;
     glGetIntegerv(GL_MAJOR_VERSION, &maj);
     glGetIntegerv(GL_MINOR_VERSION, &min);
