@@ -11,6 +11,9 @@
 #include <dake/math/matrix.hpp>
 #include <dake/gl/vertex_array.hpp>
 #include <dake/gl/vertex_attrib.hpp>
+#include <dake/container/algorithm.hpp>
+#include <dake/helper/function.hpp>
+#include <Eigen/Eigenvalues>
 
 #include "cloud.hpp"
 #include "kd_tree.hpp"
@@ -24,6 +27,8 @@
 
 using namespace dake::math;
 using namespace dake::gl;
+using namespace dake::container;
+using namespace dake::helper;
 
 
 cloud::cloud(const std::string &name):
@@ -315,6 +320,52 @@ void cloud::recalc_density(int k)
 
         pt.density = k / (static_cast<float>(M_PI) * r * r);
     }
+}
+
+
+void cloud::recalc_normals(int k)
+{
+    kd_tree<3> kdt(*this, INT_MAX, 10);
+
+    for (point &pt: p) {
+        std::vector<const point *> knn = kdt.knn(pt.position, k);
+
+        vec3 expectation = inject(knn, vec3::zero(), [](const vec3 &p1, const point *p2) { return p1 + p2->position; }) / k;
+        mat3 cov_mat;
+
+        for (int r = 0; r < 3; r++) {
+            for (int c = 0; c < 3; c++) {
+                cov_mat[c][r] = inject(map<float>(knn, [&](const point *p1) { return (p1->position[r] - expectation[r]) * (p1->position[c] - expectation[c]); }), 0.f, sum) / k;
+            }
+        }
+
+        // Always nice to have compatible libraries
+        Eigen::Matrix3f eigen_cov_mat(cov_mat);
+        Eigen::EigenSolver<Eigen::Matrix3f> cov_mat_solver(eigen_cov_mat);
+
+        Eigen::Vector3f eigen_eigenvalues(cov_mat_solver.eigenvalues().real());
+        Eigen::Matrix3f eigen_eigenvectors(cov_mat_solver.eigenvectors().real());
+
+        vec3 eigenvalues(vec3::from_data(eigen_eigenvalues.data()));
+        mat3 eigenvectors(mat3::from_data(eigen_eigenvectors.data()));
+        // dake is pretty useless for eigenvalue stuff, as it invokes ruby for
+        // every single matrix (I was too lazy to either implement it myself or
+        // at least embed ruby)
+
+        int min_ev_index = 0;
+        float min_ev = HUGE_VALF;
+        for (int i = 0; i < 3; i++) {
+            if (eigenvalues[i] < min_ev) {
+                min_ev = eigenvalues[i];
+                min_ev_index = i;
+            }
+        }
+
+        // FIXME: Determine direction
+        pt.normal = eigenvectors[min_ev_index].normalized();
+    }
+
+    varr_valid = rng_varr_valid = density_valid = false;
 }
 
 

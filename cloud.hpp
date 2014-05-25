@@ -154,6 +154,8 @@ class cloud {
 
 
         void cull_outliers(float cull_ratio, int k = 10);
+        void recalc_density(int k);
+        void recalc_normals(int k);
 
 
     private:
@@ -168,8 +170,6 @@ class cloud {
             point_counter(dake::math::vec3 p, dake::math::vec3 n, dake::math::vec3 c, float d): point(p, n, c, d), count(1) {}
             size_t count;
         };
-
-        void recalc_density(int k);
 };
 
 

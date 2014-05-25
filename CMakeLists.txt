@@ -35,7 +35,7 @@ endif(WIN32)
 
 ExternalProject_Get_Property(dake binary_dir)
 
-include_directories(${binary_dir}/include)
+include_directories(${binary_dir}/include /usr/include/eigen3)
 link_directories(${binary_dir})
 
 add_executable(cg2p1 main.cpp cloud.cpp window.cpp render_output.cpp shader_sources.cpp kd_tree.cpp)

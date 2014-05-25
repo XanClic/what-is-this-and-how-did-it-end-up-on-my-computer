@@ -32,6 +32,7 @@ class window:
         void load_cloud(void);
         void store_cloud(void);
         void do_cull(void);
+        void recalc_normals(void);
 
     private:
         QWidget *i_hate_qt;
@@ -39,14 +40,14 @@ class window:
         render_output *gl;
         QHBoxLayout *l1, *ldl;
         QVBoxLayout *l2;
-        QFrame *f[5];
+        QFrame *f[6];
         QCheckBox *smooth_points, *lighting, *colored, *rng;
         QDoubleSpinBox *point_size, *normal_length, *fov, *ld_x, *ld_y, *ld_z, *cull_ratio;
-        QLabel *point_size_label, *normal_length_label, *fov_label, *ld, *rng_k_label, *cull_ratio_label;
-        QPushButton *unify, *load, *store, *cull;
+        QLabel *point_size_label, *normal_length_label, *fov_label, *ld, *k_label, *cull_ratio_label;
+        QPushButton *unify, *load, *store, *cull, *renormal;
         QDoubleSpinBox *unify_res;
         QComboBox *clouds;
-        QSpinBox *rng_k;
+        QSpinBox *k;
 };
 
 #endif
