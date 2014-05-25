@@ -162,20 +162,21 @@ window::window(void):
     normal_length = new QDoubleSpinBox;
     normal_length->setSingleStep(.1);
     normal_length->setRange(-HUGE_VAL, HUGE_VAL);
+    renormal = new QPushButton("Recalculate normals");
     fov_label = new QLabel("FOV:");
     fov = new QDoubleSpinBox;
     fov->setRange(.01, 179.99);
     fov->setValue(45.);
-    rng = new QCheckBox("Riemann misete");
-    rng_k_label = new QLabel("k (neighbor count):");
-    rng_k = new QSpinBox;
-    rng_k->setRange(1, INT_MAX);
-    rng_k->setValue(5);
     cull = new QPushButton("Cull outliers");
     cull_ratio_label = new QLabel("Percentage to cull:");
     cull_ratio = new QDoubleSpinBox;
     cull_ratio->setRange(0., 100.);
     cull_ratio->setValue(10.);
+    k_label = new QLabel("k (neighbor count):");
+    k = new QSpinBox;
+    k->setRange(1, INT_MAX);
+    k->setValue(5);
+    rng = new QCheckBox("Riemann graph");
 
     for (QFrame *&fr: f) {
         fr = new QFrame;
@@ -205,16 +206,18 @@ window::window(void):
     l2->addWidget(f[2]);
     l2->addWidget(normal_length_label);
     l2->addWidget(normal_length);
+    l2->addWidget(renormal);
     l2->addWidget(f[3]);
     l2->addWidget(fov_label);
     l2->addWidget(fov);
     l2->addWidget(f[4]);
-    l2->addWidget(rng);
-    l2->addWidget(rng_k_label);
-    l2->addWidget(rng_k);
     l2->addWidget(cull);
     l2->addWidget(cull_ratio_label);
     l2->addWidget(cull_ratio);
+    l2->addWidget(f[5]);
+    l2->addWidget(k_label);
+    l2->addWidget(k);
+    l2->addWidget(rng);
     l2->addStretch();
 
     int highest = fls(QGLFormat::openGLVersionFlags());
@@ -244,12 +247,13 @@ window::window(void):
     connect(normal_length, SIGNAL(valueChanged(double)), gl, SLOT(change_normal_length(double)));
     connect(fov, SIGNAL(valueChanged(double)), gl, SLOT(change_fov(double)));
     connect(rng, SIGNAL(stateChanged(int)), gl, SLOT(toggle_rng(int)));
-    connect(rng_k, SIGNAL(valueChanged(int)), gl, SLOT(set_rng_k(int)));
+    connect(k, SIGNAL(valueChanged(int)), gl, SLOT(set_rng_k(int)));
 
     connect(unify, SIGNAL(pressed()), this, SLOT(do_unify()));
     connect(load, SIGNAL(pressed()), this, SLOT(load_cloud()));
     connect(store, SIGNAL(pressed()), this, SLOT(store_cloud()));
     connect(cull, SIGNAL(pressed()), this, SLOT(do_cull()));
+    connect(renormal, SIGNAL(pressed()), this, SLOT(recalc_normals()));
 
     l1 = new QHBoxLayout;
     l1->addWidget(gl, 1);
@@ -264,14 +268,15 @@ window::~window(void)
     delete l2;
     delete ldl;
     delete gl;
+    delete rng;
+    delete k;
+    delete k_label;
     delete cull_ratio;
     delete cull_ratio_label;
     delete cull;
-    delete rng_k;
-    delete rng_k_label;
-    delete rng;
     delete fov;
     delete fov_label;
+    delete renormal;
     delete normal_length;
     delete normal_length_label;
     delete ld_z;
@@ -369,10 +374,22 @@ void window::store_cloud(void)
 void window::do_cull(void)
 {
     float ratio = static_cast<float>(cull_ratio->value()) / 100.f;
-    int k = rng_k->value();
+    int kv = k->value();
 
     for (cloud &c: cm.clouds()) {
-        c.cull_outliers(ratio, k);
+        c.cull_outliers(ratio, kv);
+    }
+
+    gl->invalidate();
+}
+
+
+void window::recalc_normals(void)
+{
+    int kv = k->value();
+
+    for (cloud &c: cm.clouds()) {
+        c.recalc_normals(kv);
     }
 
     gl->invalidate();
