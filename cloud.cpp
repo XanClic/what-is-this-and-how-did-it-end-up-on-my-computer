@@ -4,6 +4,7 @@
 #include <cmath>
 #include <iostream>
 #include <fstream>
+#include <future>
 #include <list>
 #include <stdexcept>
 #include <sstream>
@@ -356,6 +357,7 @@ struct edge {
     edge(int _i, int _j, float w): i(_i), j(_j), weight(w) {}
 
     bool operator<(const edge &e) const { return weight < e.weight; }
+    bool operator==(const edge &e) const { return ((i == e.i) && (j == e.j)) || ((i == e.j) && (j == e.i)); }
 };
 
 
@@ -370,72 +372,85 @@ void cloud::recalc_normals(int k, bool orientation)
     kd_tree<3> kdt(*this, INT_MAX, 10);
 
     // TODO: The RNG could be its own class
-    // The unordered map is just a very sophisticated way of duplicate elimination
-    std::unordered_map<std::pair<int, int>, bool> rng;
     std::vector<edge> rng_edges;
+    std::mutex rng_edges_mutex;
 
-    for (int i = 0; i < static_cast<int>(point_count); i++) {
-        point &pt = p[i];
+#define THREADS 4 // FIXME
 
-        std::vector<const point *> knn = kdt.knn(pt.position, k);
+    auto rng_thread = [&](int thread_index) {
+        for (int i = thread_index; i < static_cast<int>(point_count); i += THREADS) {
+            point &pt = p[i];
 
-        vec3 expectation = inject(knn, vec3::zero(), [](const vec3 &p1, const point *p2) { return p1 + p2->position; }) / k;
-        mat3 cov_mat;
+            std::vector<const point *> knn = kdt.knn(pt.position, k);
 
-        for (int r = 0; r < 3; r++) {
-            for (int c = 0; c < 3; c++) {
-                cov_mat[c][r] = inject(map<float>(knn, [&](const point *p1) { return (p1->position[r] - expectation[r]) * (p1->position[c] - expectation[c]); }), 0.f, sum) / k;
-            }
-        }
+            vec3 expectation = inject(knn, vec3::zero(), [](const vec3 &p1, const point *p2) { return p1 + p2->position; }) / k;
+            mat3 cov_mat;
 
-        // Always nice to have compatible libraries
-        Eigen::Matrix3f eigen_cov_mat(cov_mat);
-        Eigen::EigenSolver<Eigen::Matrix3f> cov_mat_solver(eigen_cov_mat);
-
-        Eigen::Vector3f eigen_eigenvalues(cov_mat_solver.eigenvalues().real());
-        Eigen::Matrix3f eigen_eigenvectors(cov_mat_solver.eigenvectors().real());
-
-        vec3 eigenvalues(vec3::from_data(eigen_eigenvalues.data()));
-        mat3 eigenvectors(mat3::from_data(eigen_eigenvectors.data()));
-        // dake is pretty useless for eigenvalue stuff, as it invokes ruby for
-        // every single matrix (I was too lazy to either implement it myself or
-        // at least embed ruby)
-
-        int min_ev_index = 0;
-        float min_ev = HUGE_VALF;
-        for (int i = 0; i < 3; i++) {
-            if (eigenvalues[i] < min_ev) {
-                min_ev = eigenvalues[i];
-                min_ev_index = i;
-            }
-        }
-
-        pt.normal = eigenvectors[min_ev_index].normalized();
-
-
-        // RNG
-        for (const point *nn: knn) {
-            // Actually, someone told me this is correct (I had a FIXME
-            // here and thought it to be broken as hell)
-            ptrdiff_t uj = nn - p.data();
-            assert((uj >= 0) && (static_cast<size_t>(uj) < point_count) && (&p[uj] == nn));
-
-            int j = static_cast<int>(uj);
-
-            // We don't want loops
-            if ((i == j) || (rng.find(std::make_pair(i, j)) != rng.end())) {
-                continue;
+            for (int r = 0; r < 3; r++) {
+                for (int c = 0; c < 3; c++) {
+                    cov_mat[c][r] = inject(map<float>(knn, [&](const point *p1) { return (p1->position[r] - expectation[r]) * (p1->position[c] - expectation[c]); }), 0.f, sum) / k;
+                }
             }
 
-            float weight = 1.f - fabs(pt.normal.dot(nn->normal));
-            rng[std::make_pair(i, j)] = true;
-            rng[std::make_pair(j, i)] = true;
+            // Always nice to have compatible libraries
+            Eigen::Matrix3f eigen_cov_mat(cov_mat);
+            Eigen::EigenSolver<Eigen::Matrix3f> cov_mat_solver(eigen_cov_mat);
 
-            rng_edges.emplace_back(i, j, weight);
+            Eigen::Vector3f eigen_eigenvalues(cov_mat_solver.eigenvalues().real());
+            Eigen::Matrix3f eigen_eigenvectors(cov_mat_solver.eigenvectors().real());
+
+            vec3 eigenvalues(vec3::from_data(eigen_eigenvalues.data()));
+            mat3 eigenvectors(mat3::from_data(eigen_eigenvectors.data()));
+            // dake is pretty useless for eigenvalue stuff, as it invokes ruby for
+            // every single matrix (I was too lazy to either implement it myself or
+            // at least embed ruby)
+
+            int min_ev_index = 0;
+            float min_ev = HUGE_VALF;
+            for (int i = 0; i < 3; i++) {
+                if (eigenvalues[i] < min_ev) {
+                    min_ev = eigenvalues[i];
+                    min_ev_index = i;
+                }
+            }
+
+            pt.normal = eigenvectors[min_ev_index].normalized();
+
+
+            // RNG
+            for (const point *nn: knn) {
+                // Actually, someone told me this is correct (I had a FIXME
+                // here and thought it to be broken as hell)
+                ptrdiff_t uj = nn - p.data();
+                assert((uj >= 0) && (static_cast<size_t>(uj) < point_count) && (&p[uj] == nn));
+
+                int j = static_cast<int>(uj);
+
+                // We don't want loops
+                if (i == j) {
+                    continue;
+                }
+
+                // TODO: lock-free
+                rng_edges_mutex.lock();
+                rng_edges.emplace_back(i, j, 1.f - fabs(pt.normal.dot(nn->normal)));;
+                rng_edges_mutex.unlock();
+            }
+
+
+            if (!thread_index) {
+                announce_progress(i + 1);
+            }
         }
+    };
 
-
-        announce_progress(i + 1);
+    std::thread *rng_threads[THREADS];
+    for (int i = 0; i < THREADS; i++) {
+        rng_threads[i] = new std::thread(rng_thread, i);
+    }
+    for (int i = 0; i < THREADS; i++) {
+        rng_threads[i]->join();
+        delete rng_threads[i];
     }
 
     varr_valid = rng_varr_valid = density_valid = false;
@@ -447,6 +462,19 @@ void cloud::recalc_normals(int k, bool orientation)
     // Sort rng_edges ascending by weight
     std::sort(rng_edges.begin(), rng_edges.end());
 
+    // Remove duplicates
+    std::vector<edge> rng_dups_removed;
+    rng_dups_removed.reserve(rng_edges.size());
+    for (auto it = rng_edges.begin(); it != rng_edges.end();) {
+        const edge &e = *it;
+        rng_dups_removed.push_back(e);
+
+        do {
+            ++it;
+        } while ((it != rng_edges.end()) && (*it == e));
+    }
+    rng_edges = std::move(rng_dups_removed);
+
     // Now use Prim-Dijkstra for finding a minimal spanning tree
     bool *has_vertex = static_cast<bool *>(calloc(point_count, sizeof *has_vertex));
     std::vector<edge> st_edges;
@@ -456,7 +484,6 @@ void cloud::recalc_normals(int k, bool orientation)
 
     size_t rebuild_edges_counter = 0;
     for (size_t vertices_found = 1; vertices_found < point_count; vertices_found++) {
-        edge new_edge(0, 0, HUGE_VALF);
         // I'd like to cull inner edges of the spanning tree afterwards so
         // they don't have to be searched here; however, std::remove_if() is
         // slow on std::vector (which is no surprise, but someone whom I
@@ -471,12 +498,34 @@ void cloud::recalc_normals(int k, bool orientation)
         // container of "available" edges as the points are visited did not work
         // out so well (it was not faster for me and the result was wrong, so I
         // did not try fixing it and went back to this version).
-        for (const edge &e: rng_edges) {
-            if (has_vertex[e.i] ^ has_vertex[e.j]) {
+
+        volatile bool found_edge = false;
+
+        auto func = [&](int thread_index) -> edge {
+            int edge_count = static_cast<int>(rng_edges.size());
+            for (int i = thread_index; (i < edge_count) && !found_edge; i += THREADS) {
+                const edge &e = rng_edges[i];
+                if (has_vertex[e.i] ^ has_vertex[e.j]) {
+                    found_edge = true;
+                    return e;
+                }
+            }
+            return edge(0, 0, HUGE_VALF);
+        };
+
+        std::future<edge> results[THREADS];
+        for (int i = 0; i < THREADS; i++) {
+            results[i] = std::async(std::launch::async, func, i);
+        }
+
+        edge new_edge(0, 0, HUGE_VALF);
+        for (std::future<edge> &fe: results) {
+            const edge &e = fe.get();
+            if ((e.i != e.j) && (e.weight < new_edge.weight)) {
                 new_edge = e;
-                break;
             }
         }
+
         if (new_edge.i == new_edge.j) {
             reset_progress();
             std::stringstream msg;
