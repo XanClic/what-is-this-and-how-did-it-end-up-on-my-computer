@@ -349,6 +349,16 @@ void cloud::recalc_density(int k)
 }
 
 
+struct edge {
+    int i, j;
+    float weight;
+
+    edge(int _i, int _j, float w): i(_i), j(_j), weight(w) {}
+
+    bool operator<(const edge &e) const { return weight < e.weight; }
+};
+
+
 void cloud::recalc_normals(int k, bool orientation)
 {
     size_t point_count = p.size();
@@ -360,8 +370,9 @@ void cloud::recalc_normals(int k, bool orientation)
     kd_tree<3> kdt(*this, INT_MAX, 10);
 
     // TODO: The RNG could be its own class
-    std::unordered_map<std::pair<int, int>, float> rng;
-    std::vector<std::pair<int, int>> rng_edges;
+    // The unordered map is just a very sophisticated way of duplicate elimination
+    std::unordered_map<std::pair<int, int>, bool> rng;
+    std::vector<edge> rng_edges;
 
     for (int i = 0; i < static_cast<int>(point_count); i++) {
         point &pt = p[i];
@@ -417,10 +428,10 @@ void cloud::recalc_normals(int k, bool orientation)
             }
 
             float weight = 1.f - fabs(pt.normal.dot(nn->normal));
-            rng[std::make_pair(i, j)] = weight;
-            rng[std::make_pair(j, i)] = weight;
+            rng[std::make_pair(i, j)] = true;
+            rng[std::make_pair(j, i)] = true;
 
-            rng_edges.push_back(std::make_pair(i, j));
+            rng_edges.emplace_back(i, j, weight);
         }
 
 
@@ -434,17 +445,18 @@ void cloud::recalc_normals(int k, bool orientation)
 
 
     // Sort rng_edges ascending by weight
-    std::sort(rng_edges.begin(), rng_edges.end(), [&rng](const std::pair<int, int> &e1, const std::pair<int, int> &e2) { return rng[e1] < rng[e2]; });
+    std::sort(rng_edges.begin(), rng_edges.end());
 
     // Now use Prim-Dijkstra for finding a minimal spanning tree
     bool *has_vertex = static_cast<bool *>(calloc(point_count, sizeof *has_vertex));
-    std::vector<std::pair<int, int>> st_edges;
+    std::vector<edge> st_edges;
 
-    has_vertex[rng_edges.front().first] = true;
+    // Just start at some random point
+    has_vertex[0] = true;
 
     size_t rebuild_edges_counter = 0;
     for (size_t vertices_found = 1; vertices_found < point_count; vertices_found++) {
-        std::pair<int, int> new_edge(0, 0);
+        edge new_edge(0, 0, HUGE_VALF);
         // I'd like to cull inner edges of the spanning tree afterwards so
         // they don't have to be searched here; however, std::remove_if() is
         // slow on std::vector (which is no surprise, but someone whom I
@@ -454,14 +466,18 @@ void cloud::recalc_normals(int k, bool orientation)
         // avoid the std::sort() does not like my comparison lambda, so this
         // would require an own class as well. An own class on the other
         // hand would not have access to the rng map.
-        // So, I just don't cull and run through the whole vector here.
-        for (const std::pair<int, int> &edge: rng_edges) {
-            if (has_vertex[edge.first] ^ has_vertex[edge.second]) {
-                new_edge = edge;
+        // Oh, and just to be clear, not using a single container for all edges
+        // but rather a container per point and then joining them into a
+        // container of "available" edges as the points are visited did not work
+        // out so well (it was not faster for me and the result was wrong, so I
+        // did not try fixing it and went back to this version).
+        for (const edge &e: rng_edges) {
+            if (has_vertex[e.i] ^ has_vertex[e.j]) {
+                new_edge = e;
                 break;
             }
         }
-        if (new_edge.first == new_edge.second) {
+        if (new_edge.i == new_edge.j) {
             reset_progress();
             std::stringstream msg;
             msg << "The constructed RNG graph has multiple components (failed at " << vertices_found << " of " << point_count << " points); try increasing k (the neighbor count for the nearest neighbor search)";
@@ -469,7 +485,7 @@ void cloud::recalc_normals(int k, bool orientation)
         }
 
         st_edges.push_back(new_edge);
-        int new_vertex = has_vertex[new_edge.first] ? new_edge.second : new_edge.first;
+        int new_vertex = has_vertex[new_edge.i] ? new_edge.j : new_edge.i;
         has_vertex[new_vertex] = true;
 
         if (++rebuild_edges_counter >= 1024) {
@@ -479,14 +495,14 @@ void cloud::recalc_normals(int k, bool orientation)
             // I need to, as it gets really slow with some models (dragon.ply,
             // I'm looking at you) otherwise. So do it only sometimes and
             // rebuild the vector instead of using std::remove_if().
-            std::vector<std::pair<int, int>> rebuilt_rng;
+            std::vector<edge> rebuilt_rng;
             // This has obviously some memory overhead, but who cares
             rebuilt_rng.reserve(rng_edges.size());
             // This only takes edges which are not inner edges of the spanning
             // tree calculated so far
-            for (const std::pair<int, int> &edge: rng_edges) {
-                if (!has_vertex[edge.first] || !has_vertex[edge.second]) {
-                    rebuilt_rng.push_back(edge);
+            for (const edge &e: rng_edges) {
+                if (!has_vertex[e.i] || !has_vertex[e.j]) {
+                    rebuilt_rng.push_back(e);
                 }
             }
 
@@ -508,10 +524,10 @@ void cloud::recalc_normals(int k, bool orientation)
     memset(has_vertex, 0, point_count * sizeof *has_vertex);
     has_vertex[0] = true;
     for (size_t vertices_found = 1; vertices_found < point_count;) {
-        for (const std::pair<int, int> &edge: st_edges) {
-            if (has_vertex[edge.first] ^ has_vertex[edge.second]) {
-                int old_vertex = has_vertex[edge.first] ? edge.first : edge.second;
-                int new_vertex = has_vertex[edge.first] ? edge.second : edge.first;
+        for (const edge &e: st_edges) {
+            if (has_vertex[e.i] ^ has_vertex[e.j]) {
+                int old_vertex = has_vertex[e.i] ? e.i : e.j;
+                int new_vertex = has_vertex[e.i] ? e.j : e.i;
 
                 if (p[old_vertex].normal.dot(p[new_vertex].normal) < 0.f) {
                     p[new_vertex].normal = -p[new_vertex].normal;
