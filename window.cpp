@@ -163,6 +163,7 @@ window::window(void):
     normal_length->setSingleStep(.1);
     normal_length->setRange(-HUGE_VAL, HUGE_VAL);
     renormal = new QPushButton("Recalculate normals");
+    renormal_inv = new QCheckBox("Invert normals");
     fov_label = new QLabel("FOV:");
     fov = new QDoubleSpinBox;
     fov->setRange(.01, 179.99);
@@ -207,6 +208,7 @@ window::window(void):
     l2->addWidget(normal_length_label);
     l2->addWidget(normal_length);
     l2->addWidget(renormal);
+    l2->addWidget(renormal_inv);
     l2->addWidget(f[3]);
     l2->addWidget(fov_label);
     l2->addWidget(fov);
@@ -276,6 +278,7 @@ window::~window(void)
     delete cull;
     delete fov;
     delete fov_label;
+    delete renormal_inv;
     delete renormal;
     delete normal_length;
     delete normal_length_label;
@@ -386,10 +389,11 @@ void window::do_cull(void)
 
 void window::recalc_normals(void)
 {
+    bool inv = renormal_inv->checkState() == Qt::Checked;
     int kv = k->value();
 
     for (cloud &c: cm.clouds()) {
-        c.recalc_normals(kv);
+        c.recalc_normals(kv, inv);
     }
 
     gl->invalidate();

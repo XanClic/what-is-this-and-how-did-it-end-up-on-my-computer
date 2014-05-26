@@ -1,5 +1,6 @@
 #include <dake/gl/gl.hpp>
 
+#include <cassert>
 #include <cmath>
 #include <iostream>
 #include <fstream>
@@ -7,6 +8,8 @@
 #include <stdexcept>
 #include <sstream>
 #include <string>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 #include <dake/math/matrix.hpp>
 #include <dake/gl/vertex_array.hpp>
@@ -29,6 +32,28 @@ using namespace dake::math;
 using namespace dake::gl;
 using namespace dake::container;
 using namespace dake::helper;
+
+
+namespace std
+{
+
+template<> struct hash<std::pair<int, int>> {
+    typedef std::pair<int, int> argument_type;
+    typedef size_t value_type;
+
+    value_type operator()(const argument_type &v) const
+    {
+        // I tried
+        return static_cast<value_type>(int_hash(v.first))
+             + static_cast<value_type>(int_hash(v.second)) * 524287;
+    }
+
+
+    private:
+        std::hash<int> int_hash;
+};
+
+}
 
 
 cloud::cloud(const std::string &name):
@@ -323,7 +348,7 @@ void cloud::recalc_density(int k)
 }
 
 
-void cloud::recalc_normals(int k)
+void cloud::recalc_normals(int k, bool orientation)
 {
     kd_tree<3> kdt(*this, INT_MAX, 10);
 
@@ -361,11 +386,108 @@ void cloud::recalc_normals(int k)
             }
         }
 
-        // FIXME: Determine direction
         pt.normal = eigenvectors[min_ev_index].normalized();
     }
 
     varr_valid = rng_varr_valid = density_valid = false;
+
+
+    size_t point_count = p.size();
+    assert(point_count <= INT_MAX);
+
+    // TODO: The RNG could be its own class
+    std::unordered_map<std::pair<int, int>, float> rng;
+    std::vector<std::pair<int, int>> rng_edges;
+
+    for (int i = 0; i < static_cast<int>(point_count); i++) {
+        // TODO: We already did this above
+        std::vector<const point *> knn = kdt.knn(p[i].position, k);
+
+        for (const point *nn: knn) {
+            // Actually, someone told me this is correct (I had a FIXME
+            // here and thought it to be broken as hell)
+            ptrdiff_t uj = nn - p.data();
+            assert((uj >= 0) && (static_cast<size_t>(uj) < point_count) && (&p[uj] == nn));
+
+            int j = static_cast<int>(uj);
+
+            // We don't want loops
+            if ((i == j) || (rng.find(std::make_pair(i, j)) != rng.end())) {
+                continue;
+            }
+
+            float weight = 1.f - fabs(p[i].normal.dot(nn->normal));
+            rng[std::make_pair(i, j)] = weight;
+            rng[std::make_pair(j, i)] = weight;
+
+            rng_edges.push_back(std::make_pair(i, j));
+        }
+    }
+
+    // Sort rng_edges ascending by weight
+    std::sort(rng_edges.begin(), rng_edges.end(), [&rng](const std::pair<int, int> &e1, const std::pair<int, int> &e2) { return rng[e1] < rng[e2]; });
+
+    // Now use Prim-Dijkstra for finding a minimal spanning tree
+    bool *has_vertex = static_cast<bool *>(calloc(point_count, sizeof *has_vertex));
+    std::vector<std::pair<int, int>> st_edges;
+    size_t vertices_found = 0;
+
+    has_vertex[rng_edges.front().first] = true;
+    vertices_found++;
+
+    while (vertices_found < point_count) {
+        std::pair<int, int> new_edge(0, 0);
+        // I'd like to cull inner edges of the spanning tree afterwards so
+        // they don't have to be searched here; however, std::remove_if() is
+        // slow on std::vector (which is no surprise, but someone whom I
+        // thought I could trust told me otherwise (that the cache could
+        // handle it all)), but using std::list (or something similar) makes
+        // std::sort() require operator-() on std::pair<>. Using std::set to
+        // avoid the std::sort() does not like my comparison lambda, so this
+        // would require an own class as well. An own class on the other
+        // hand would not have access to the rng map.
+        // So, I just don't cull and run through the whole vector here.
+        for (const std::pair<int, int> &edge: rng_edges) {
+            if (has_vertex[edge.first] ^ has_vertex[edge.second]) {
+                new_edge = edge;
+                break;
+            }
+        }
+        if (new_edge.first == new_edge.second) {
+            throw std::logic_error("The constructed RNG graph has multiple components; try increasing k (the neighbor count for the nearest neighbor search)");
+        }
+
+        st_edges.push_back(new_edge);
+        int new_vertex = has_vertex[new_edge.first] ? new_edge.second : new_edge.first;
+        has_vertex[new_vertex] = true;
+        vertices_found++;
+    }
+
+    if (orientation) {
+        p[0].normal = -p[0].normal;
+    }
+
+    // I like it although it's kind of strange
+    memset(has_vertex, 0, point_count * sizeof *has_vertex);
+    has_vertex[0] = true;
+    vertices_found = 1;
+    while (vertices_found < point_count) {
+        for (const std::pair<int, int> &edge: st_edges) {
+            if (has_vertex[edge.first] ^ has_vertex[edge.second]) {
+                int old_vertex = has_vertex[edge.first] ? edge.first : edge.second;
+                int new_vertex = has_vertex[edge.first] ? edge.second : edge.first;
+
+                if (p[old_vertex].normal.dot(p[new_vertex].normal) < 0.f) {
+                    p[new_vertex].normal = -p[new_vertex].normal;
+                }
+
+                has_vertex[new_vertex] = true;
+                vertices_found++;
+            }
+        }
+    }
+
+    free(has_vertex);
 }
 
 
