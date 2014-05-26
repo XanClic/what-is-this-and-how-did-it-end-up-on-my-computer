@@ -155,7 +155,7 @@ class cloud {
 
         void cull_outliers(float cull_ratio, int k = 10);
         void recalc_density(int k);
-        void recalc_normals(int k);
+        void recalc_normals(int k, bool orientation = false);
 
 
     private:

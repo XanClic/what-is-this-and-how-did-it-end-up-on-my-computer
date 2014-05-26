@@ -41,7 +41,7 @@ class window:
         QHBoxLayout *l1, *ldl;
         QVBoxLayout *l2;
         QFrame *f[6];
-        QCheckBox *smooth_points, *lighting, *colored, *rng;
+        QCheckBox *smooth_points, *lighting, *colored, *rng, *renormal_inv;
         QDoubleSpinBox *point_size, *normal_length, *fov, *ld_x, *ld_y, *ld_z, *cull_ratio;
         QLabel *point_size_label, *normal_length_label, *fov_label, *ld, *k_label, *cull_ratio_label;
         QPushButton *unify, *load, *store, *cull, *renormal;
