@@ -87,9 +87,9 @@ window::window(void):
         // incapable of interoperating. Yeah, I know, the STL is shit, and C is,
         // too. But I don't think so. I'd like to use both when appropriate and
         // I'd love my framework to handle that with grace. Why can't I
-        // construct a QString from std::string? Why can't I cast QString to
+        // construct a QString from std::string?* Why can't I cast QString to
         // std::string implicitly? Why don't they support pointers to arbitrary
-        // types in QVariant? Or just void pointers?* I KNOW WHAT I'M DOING
+        // types in QVariant? Or just void pointers?*& I KNOW WHAT I'M DOING
         // THAT'S WHY I'M WRITING C++ IN THE FIRST PLACE THANK YOU VERY MUCH
         // oh god qt is so bad
         //
@@ -120,7 +120,10 @@ window::window(void):
         //
         //
         //
-        // *Yes, I have indeed been told that Qt does support this in two ways:
+        // *Actually, I found out I can: QString::fromStdString(), but the
+        // internet says this is bad (because it is optional).
+        //
+        // **Yes, I have indeed been told that Qt does support this in two ways:
         //  (1) add your custom type to the Qt type system - I want a library, I
         //      have been told one could use Qt as a library, therefore I will
         //      use it as a library and _not_ incorporate my types into its
@@ -308,7 +311,11 @@ void window::do_unify(void)
 {
     clouds->clear();
 
-    cm.unify(unify_res->value(), "Unification");
+    try {
+        cm.unify(unify_res->value(), "Unification");
+    } catch (const std::exception &e) {
+        QMessageBox::critical(this, "Error", QString("Could not unify: ") + QString(e.what()));
+    }
 
     for (const cloud &c: cm.clouds()) {
         // do you feel the suffering
@@ -338,7 +345,11 @@ void window::load_cloud(void)
             continue;
         }
 
-        cm.load_new(inp, QFileInfo(path).fileName().toUtf8().constData());
+        try {
+            cm.load_new(inp, QFileInfo(path).fileName().toUtf8().constData());
+        } catch (const std::exception &e) {
+            QMessageBox::critical(this, "Error", QString("Could not load from ") + path + QString(": ") + QString(e.what()));
+        }
     }
 
     clouds->clear();
@@ -368,7 +379,13 @@ void window::store_cloud(void)
     // jesus died for you
     // and i died of qt
     // (what am i even talking about)
-    reinterpret_cast<const cloud *>(static_cast<uintptr_t>(clouds->currentData().value<qulonglong>()))->store(out);
+    const cloud *c = reinterpret_cast<const cloud *>(static_cast<uintptr_t>(clouds->currentData().value<qulonglong>()));
+
+    try {
+        c->store(out);
+    } catch (const std::exception &e) {
+        QMessageBox::critical(this, "Error", QString("Could not store ") + QString(c->name().c_str()) + QString(": ") + QString(e.what()));
+    }
 
     // accept jesus
 }
@@ -380,7 +397,11 @@ void window::do_cull(void)
     int kv = k->value();
 
     for (cloud &c: cm.clouds()) {
-        c.cull_outliers(ratio, kv);
+        try {
+            c.cull_outliers(ratio, kv);
+        } catch (const std::exception &e) {
+            QMessageBox::critical(this, "Error", QString("Could not cull outliers from ") + QString(c.name().c_str()) + QString(": ") + QString(e.what()));
+        }
     }
 
     gl->invalidate();
@@ -393,7 +414,11 @@ void window::recalc_normals(void)
     int kv = k->value();
 
     for (cloud &c: cm.clouds()) {
-        c.recalc_normals(kv, inv);
+        try {
+            c.recalc_normals(kv, inv);
+        } catch (const std::exception &e) {
+            QMessageBox::critical(this, "Error", QString("Could not recalculate the normals for ") + QString(c.name().c_str()) + QString(": ") + QString(e.what()));
+        }
     }
 
     gl->invalidate();
