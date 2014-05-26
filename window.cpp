@@ -16,6 +16,7 @@
 #include <QMessageBox>
 #include <QFrame>
 #include <QComboBox>
+#include <QProgressBar>
 
 #include "cloud.hpp"
 #include "render_output.hpp"
@@ -23,6 +24,34 @@
 
 
 extern cloud_manager cm;
+
+
+// GO ALONG THERE'S NOTHING TO BE SEEN HERE
+QProgressBar *global_progress;
+static int minimum_progress;
+
+void init_progress(const char *format, int max)
+{
+    global_progress->reset();
+    global_progress->setFormat(format);
+    global_progress->setRange(0, max);
+
+    minimum_progress = max / 100;
+}
+
+void announce_progress(int amount)
+{
+    static int last_update;
+
+    if (abs(amount - last_update) >= minimum_progress) {
+        global_progress->setValue(last_update = amount);
+    }
+}
+
+void reset_progress(void)
+{
+    global_progress->reset();
+}
 
 
 static int fls(int mask)
@@ -182,6 +211,9 @@ window::window(void):
     k->setValue(5);
     rng = new QCheckBox("Riemann graph");
 
+    global_progress = new QProgressBar;
+    global_progress->setTextVisible(true);
+
     for (QFrame *&fr: f) {
         fr = new QFrame;
         fr->setFrameShape(QFrame::HLine);
@@ -224,6 +256,7 @@ window::window(void):
     l2->addWidget(k);
     l2->addWidget(rng);
     l2->addStretch();
+    l2->addWidget(global_progress);
 
     int highest = fls(QGLFormat::openGLVersionFlags());
     if (!highest)
@@ -273,6 +306,7 @@ window::~window(void)
     delete l2;
     delete ldl;
     delete gl;
+    delete global_progress;
     delete rng;
     delete k;
     delete k_label;
@@ -309,6 +343,10 @@ window::~window(void)
 
 void window::do_unify(void)
 {
+    if (cm.clouds().empty()) {
+        return;
+    }
+
     clouds->clear();
 
     try {
@@ -365,6 +403,10 @@ void window::load_cloud(void)
 
 void window::store_cloud(void)
 {
+    if (clouds->currentIndex() < 0) {
+        return;
+    }
+
     QString path = QFileDialog::getSaveFileName(this,
                                                 "Store point cloud",
                                                 QString(),

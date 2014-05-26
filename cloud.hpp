@@ -183,9 +183,7 @@ class cloud_manager {
         std::list<cloud> &clouds(void)
         { return *c; }
 
-        void load_new(std::ifstream &s, const std::string &name = "(unnamed)")
-        { c->emplace_back(name); c->back().load(s); }
-
+        void load_new(std::ifstream &s, const std::string &name = "(unnamed)");
         void unify(float resolution, const std::string &name = "(unnamed)");
 
 

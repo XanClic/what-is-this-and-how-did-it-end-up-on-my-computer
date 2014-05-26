@@ -50,4 +50,9 @@ class window:
         QSpinBox *k;
 };
 
+
+void init_progress(const char *format, int max);
+void announce_progress(int amount);
+void reset_progress(void);
+
 #endif
