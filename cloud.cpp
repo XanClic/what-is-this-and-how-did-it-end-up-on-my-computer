@@ -21,6 +21,7 @@
 #include "cloud.hpp"
 #include "kd_tree.hpp"
 #include "point.hpp"
+#include "window.hpp"
 
 
 #ifndef M_PI
@@ -350,9 +351,21 @@ void cloud::recalc_density(int k)
 
 void cloud::recalc_normals(int k, bool orientation)
 {
+    size_t point_count = p.size();
+    assert(point_count <= INT_MAX);
+
+
+    init_progress("Normals/RNG (%p %)", point_count);
+
     kd_tree<3> kdt(*this, INT_MAX, 10);
 
-    for (point &pt: p) {
+    // TODO: The RNG could be its own class
+    std::unordered_map<std::pair<int, int>, float> rng;
+    std::vector<std::pair<int, int>> rng_edges;
+
+    for (int i = 0; i < static_cast<int>(point_count); i++) {
+        point &pt = p[i];
+
         std::vector<const point *> knn = kdt.knn(pt.position, k);
 
         vec3 expectation = inject(knn, vec3::zero(), [](const vec3 &p1, const point *p2) { return p1 + p2->position; }) / k;
@@ -387,22 +400,9 @@ void cloud::recalc_normals(int k, bool orientation)
         }
 
         pt.normal = eigenvectors[min_ev_index].normalized();
-    }
-
-    varr_valid = rng_varr_valid = density_valid = false;
 
 
-    size_t point_count = p.size();
-    assert(point_count <= INT_MAX);
-
-    // TODO: The RNG could be its own class
-    std::unordered_map<std::pair<int, int>, float> rng;
-    std::vector<std::pair<int, int>> rng_edges;
-
-    for (int i = 0; i < static_cast<int>(point_count); i++) {
-        // TODO: We already did this above
-        std::vector<const point *> knn = kdt.knn(p[i].position, k);
-
+        // RNG
         for (const point *nn: knn) {
             // Actually, someone told me this is correct (I had a FIXME
             // here and thought it to be broken as hell)
@@ -416,13 +416,22 @@ void cloud::recalc_normals(int k, bool orientation)
                 continue;
             }
 
-            float weight = 1.f - fabs(p[i].normal.dot(nn->normal));
+            float weight = 1.f - fabs(pt.normal.dot(nn->normal));
             rng[std::make_pair(i, j)] = weight;
             rng[std::make_pair(j, i)] = weight;
 
             rng_edges.push_back(std::make_pair(i, j));
         }
+
+
+        announce_progress(i + 1);
     }
+
+    varr_valid = rng_varr_valid = density_valid = false;
+
+
+    init_progress("MST (%p %)", point_count);
+
 
     // Sort rng_edges ascending by weight
     std::sort(rng_edges.begin(), rng_edges.end(), [&rng](const std::pair<int, int> &e1, const std::pair<int, int> &e2) { return rng[e1] < rng[e2]; });
@@ -430,12 +439,11 @@ void cloud::recalc_normals(int k, bool orientation)
     // Now use Prim-Dijkstra for finding a minimal spanning tree
     bool *has_vertex = static_cast<bool *>(calloc(point_count, sizeof *has_vertex));
     std::vector<std::pair<int, int>> st_edges;
-    size_t vertices_found = 0;
 
     has_vertex[rng_edges.front().first] = true;
-    vertices_found++;
 
-    while (vertices_found < point_count) {
+    size_t rebuild_edges_counter = 0;
+    for (size_t vertices_found = 1; vertices_found < point_count; vertices_found++) {
         std::pair<int, int> new_edge(0, 0);
         // I'd like to cull inner edges of the spanning tree afterwards so
         // they don't have to be searched here; however, std::remove_if() is
@@ -454,14 +462,43 @@ void cloud::recalc_normals(int k, bool orientation)
             }
         }
         if (new_edge.first == new_edge.second) {
-            throw std::logic_error("The constructed RNG graph has multiple components; try increasing k (the neighbor count for the nearest neighbor search)");
+            reset_progress();
+            std::stringstream msg;
+            msg << "The constructed RNG graph has multiple components (failed at " << vertices_found << " of " << point_count << " points); try increasing k (the neighbor count for the nearest neighbor search)";
+            throw std::logic_error(msg.str());
         }
 
         st_edges.push_back(new_edge);
         int new_vertex = has_vertex[new_edge.first] ? new_edge.second : new_edge.first;
         has_vertex[new_vertex] = true;
-        vertices_found++;
+
+        if (++rebuild_edges_counter >= 1024) {
+            rebuild_edges_counter = 0;
+
+            // Okay, above I said I won't to std::remove_if(). But I found out
+            // I need to, as it gets really slow with some models (dragon.ply,
+            // I'm looking at you) otherwise. So do it only sometimes and
+            // rebuild the vector instead of using std::remove_if().
+            std::vector<std::pair<int, int>> rebuilt_rng;
+            // This has obviously some memory overhead, but who cares
+            rebuilt_rng.reserve(rng_edges.size());
+            // This only takes edges which are not inner edges of the spanning
+            // tree calculated so far
+            for (const std::pair<int, int> &edge: rng_edges) {
+                if (!has_vertex[edge.first] || !has_vertex[edge.second]) {
+                    rebuilt_rng.push_back(edge);
+                }
+            }
+
+            rng_edges = std::move(rebuilt_rng);
+        }
+
+        announce_progress(vertices_found + 1);
     }
+
+
+    init_progress("Homogenizing (%p %)", point_count);
+
 
     if (orientation) {
         p[0].normal = -p[0].normal;
@@ -470,8 +507,7 @@ void cloud::recalc_normals(int k, bool orientation)
     // I like it although it's kind of strange
     memset(has_vertex, 0, point_count * sizeof *has_vertex);
     has_vertex[0] = true;
-    vertices_found = 1;
-    while (vertices_found < point_count) {
+    for (size_t vertices_found = 1; vertices_found < point_count;) {
         for (const std::pair<int, int> &edge: st_edges) {
             if (has_vertex[edge.first] ^ has_vertex[edge.second]) {
                 int old_vertex = has_vertex[edge.first] ? edge.first : edge.second;
@@ -485,9 +521,27 @@ void cloud::recalc_normals(int k, bool orientation)
                 vertices_found++;
             }
         }
+
+        announce_progress(vertices_found);
     }
 
     free(has_vertex);
+
+
+    reset_progress();
+}
+
+
+void cloud_manager::load_new(std::ifstream &s, const std::string &name)
+{
+    c->emplace_back(name);
+
+    try {
+        c->back().load(s);
+    } catch (...) {
+        c->pop_back();
+        throw;
+    }
 }
 
 
