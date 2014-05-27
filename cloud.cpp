@@ -4,11 +4,11 @@
 #include <cmath>
 #include <iostream>
 #include <fstream>
-#include <future>
 #include <list>
 #include <stdexcept>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -22,6 +22,7 @@
 #include "cloud.hpp"
 #include "kd_tree.hpp"
 #include "point.hpp"
+#include "rng.hpp"
 #include "window.hpp"
 
 
@@ -288,20 +289,16 @@ vertex_array *cloud::rng_vertex_array(int k)
             rng_varr = new dake::gl::vertex_array;
         }
 
-        // Because I'm lazy
-        std::vector<vec3> lines;
-        kd_tree<3> kdt(*this, INT_MAX, 10);
+        std::vector<std::pair<vec3, vec3>> lines;
+        rng r(*this, k);
 
-        for (const point &pt: p) {
-            std::vector<const point *> knn = kdt.knn(pt.position, k);
-
-            for (const point *nn: knn) {
-                lines.push_back(pt.position);
-                lines.push_back(nn->position);
-            }
+        for (const rng::edge &e: r) {
+            // TODO: Maybe we could do something with indices here (instead of
+            // giving the full coordinates to OpenGL)
+            lines.emplace_back(p[e.i].position, p[e.j].position);
         }
 
-        rng_varr->set_elements(lines.size());
+        rng_varr->set_elements(lines.size() * 2);
         rng_varr->bind();
 
         vertex_attrib *va_p = rng_varr->attrib(0);
@@ -337,8 +334,11 @@ void cloud::cull_outliers(float cull_ratio, int k)
 
 void cloud::recalc_density(int k)
 {
+    init_progress("Density (%p %)", p.size());
+
     kd_tree<3> kdt(*this, INT_MAX, 10);
 
+    int i = 0;
     for (point &pt: p) {
         std::vector<const point *> knn = kdt.knn(pt.position, k);
 
@@ -346,19 +346,12 @@ void cloud::recalc_density(int k)
         float r = (knn.back()->position - pt.position).length();
 
         pt.density = k / (static_cast<float>(M_PI) * r * r);
+
+        announce_progress(++i);
     }
+
+    reset_progress();
 }
-
-
-struct edge {
-    int i, j;
-    float weight;
-
-    edge(int _i, int _j, float w): i(_i), j(_j), weight(w) {}
-
-    bool operator<(const edge &e) const { return weight < e.weight; }
-    bool operator==(const edge &e) const { return ((i == e.i) && (j == e.j)) || ((i == e.j) && (j == e.i)); }
-};
 
 
 void cloud::recalc_normals(int k, bool orientation)
@@ -366,22 +359,20 @@ void cloud::recalc_normals(int k, bool orientation)
     size_t point_count = p.size();
     assert(point_count <= INT_MAX);
 
+    int thread_count = std::thread::hardware_concurrency();
 
-    init_progress("Normals/RNG (%p %)", point_count);
+
+    init_progress("Normals (%p %)", point_count);
 
     kd_tree<3> kdt(*this, INT_MAX, 10);
 
-    // TODO: The RNG could be its own class
-    std::vector<edge> rng_edges;
-    std::mutex rng_edges_mutex;
-
-#define THREADS 4 // FIXME
-
-    auto rng_thread = [&](int thread_index) {
-        for (int i = thread_index; i < static_cast<int>(point_count); i += THREADS) {
-            point &pt = p[i];
-
-            std::vector<const point *> knn = kdt.knn(pt.position, k);
+    // I tried to call this function from the RNG constructor (which calculates
+    // both the kd tree and KNN), but it did not work out so well. Either way,
+    // as the MST problem takes much more time (for my computer at least), it's
+    // probably not so important to optimize this anyway.
+    auto normal_calc_thread = [&](int thread_index) {
+        for (int i = thread_index; i < static_cast<int>(point_count); i += thread_count) {
+            std::vector<const point *> knn(kdt.knn(p[i].position, k));
 
             vec3 expectation = inject(knn, vec3::zero(), [](const vec3 &p1, const point *p2) { return p1 + p2->position; }) / k;
             mat3 cov_mat;
@@ -414,28 +405,7 @@ void cloud::recalc_normals(int k, bool orientation)
                 }
             }
 
-            pt.normal = eigenvectors[min_ev_index].normalized();
-
-
-            // RNG
-            for (const point *nn: knn) {
-                // Actually, someone told me this is correct (I had a FIXME
-                // here and thought it to be broken as hell)
-                ptrdiff_t uj = nn - p.data();
-                assert((uj >= 0) && (static_cast<size_t>(uj) < point_count) && (&p[uj] == nn));
-
-                int j = static_cast<int>(uj);
-
-                // We don't want loops
-                if (i == j) {
-                    continue;
-                }
-
-                // TODO: lock-free
-                rng_edges_mutex.lock();
-                rng_edges.emplace_back(i, j, 1.f - fabs(pt.normal.dot(nn->normal)));;
-                rng_edges_mutex.unlock();
-            }
+            p[i].normal = eigenvectors[min_ev_index].normalized();
 
 
             if (!thread_index) {
@@ -444,45 +414,34 @@ void cloud::recalc_normals(int k, bool orientation)
         }
     };
 
-    std::thread *rng_threads[THREADS];
-    for (int i = 0; i < THREADS; i++) {
-        rng_threads[i] = new std::thread(rng_thread, i);
+    std::thread *threads[thread_count];
+    for (int i = 0; i < thread_count; i++) {
+        threads[i] = new std::thread(normal_calc_thread, i);
     }
-    for (int i = 0; i < THREADS; i++) {
-        rng_threads[i]->join();
-        delete rng_threads[i];
+    for (int i = 0; i < thread_count; i++) {
+        threads[i]->join();
+        delete threads[i];
     }
+
 
     varr_valid = rng_varr_valid = density_valid = false;
 
 
+    rng r(*this, k);
+    r.sort();
+
+
     init_progress("MST (%p %)", point_count);
-
-
-    // Sort rng_edges ascending by weight
-    std::sort(rng_edges.begin(), rng_edges.end());
-
-    // Remove duplicates
-    std::vector<edge> rng_dups_removed;
-    rng_dups_removed.reserve(rng_edges.size());
-    for (auto it = rng_edges.begin(); it != rng_edges.end();) {
-        const edge &e = *it;
-        rng_dups_removed.push_back(e);
-
-        do {
-            ++it;
-        } while ((it != rng_edges.end()) && (*it == e));
-    }
-    rng_edges = std::move(rng_dups_removed);
 
     // Now use Prim-Dijkstra for finding a minimal spanning tree
     bool *has_vertex = static_cast<bool *>(calloc(point_count, sizeof *has_vertex));
-    std::vector<edge> st_edges;
+    std::vector<rng::edge> st_edges;
+    st_edges.reserve(point_count - 1);
 
     // Just start at some random point
     has_vertex[0] = true;
 
-    size_t rebuild_edges_counter = 0;
+    size_t rebuild_counter = 0;
     for (size_t vertices_found = 1; vertices_found < point_count; vertices_found++) {
         // I'd like to cull inner edges of the spanning tree afterwards so
         // they don't have to be searched here; however, std::remove_if() is
@@ -499,30 +458,12 @@ void cloud::recalc_normals(int k, bool orientation)
         // out so well (it was not faster for me and the result was wrong, so I
         // did not try fixing it and went back to this version).
 
-        volatile bool found_edge = false;
-
-        auto func = [&](int thread_index) -> edge {
-            int edge_count = static_cast<int>(rng_edges.size());
-            for (int i = thread_index; (i < edge_count) && !found_edge; i += THREADS) {
-                const edge &e = rng_edges[i];
-                if (has_vertex[e.i] ^ has_vertex[e.j]) {
-                    found_edge = true;
-                    return e;
-                }
-            }
-            return edge(0, 0, HUGE_VALF);
-        };
-
-        std::future<edge> results[THREADS];
-        for (int i = 0; i < THREADS; i++) {
-            results[i] = std::async(std::launch::async, func, i);
-        }
-
-        edge new_edge(0, 0, HUGE_VALF);
-        for (std::future<edge> &fe: results) {
-            const edge &e = fe.get();
-            if ((e.i != e.j) && (e.weight < new_edge.weight)) {
+        // Threading the following loop yields horrible results
+        rng::edge new_edge(0, 0, HUGE_VALF);
+        for (const rng::edge &e: r) {
+            if (has_vertex[e.i] ^ has_vertex[e.j]) {
                 new_edge = e;
+                break;
             }
         }
 
@@ -537,25 +478,26 @@ void cloud::recalc_normals(int k, bool orientation)
         int new_vertex = has_vertex[new_edge.i] ? new_edge.j : new_edge.i;
         has_vertex[new_vertex] = true;
 
-        if (++rebuild_edges_counter >= 1024) {
-            rebuild_edges_counter = 0;
+        if (++rebuild_counter >= 1024) {
+            rebuild_counter = 0;
 
             // Okay, above I said I won't to std::remove_if(). But I found out
             // I need to, as it gets really slow with some models (dragon.ply,
             // I'm looking at you) otherwise. So do it only sometimes and
             // rebuild the vector instead of using std::remove_if().
-            std::vector<edge> rebuilt_rng;
-            // This has obviously some memory overhead, but who cares
-            rebuilt_rng.reserve(rng_edges.size());
+            std::vector<rng::edge> rebuilt_rng;
+            // Some memory overhead, but who cares
+            rebuilt_rng.reserve(r.edges().size());
             // This only takes edges which are not inner edges of the spanning
             // tree calculated so far
-            for (const edge &e: rng_edges) {
+            // (doing this in the background does not help btw)
+            for (const rng::edge &e: r) {
                 if (!has_vertex[e.i] || !has_vertex[e.j]) {
                     rebuilt_rng.push_back(e);
                 }
             }
 
-            rng_edges = std::move(rebuilt_rng);
+            r.edges() = std::move(rebuilt_rng);
         }
 
         announce_progress(vertices_found + 1);
@@ -573,7 +515,7 @@ void cloud::recalc_normals(int k, bool orientation)
     memset(has_vertex, 0, point_count * sizeof *has_vertex);
     has_vertex[0] = true;
     for (size_t vertices_found = 1; vertices_found < point_count;) {
-        for (const edge &e: st_edges) {
+        for (const rng::edge &e: st_edges) {
             if (has_vertex[e.i] ^ has_vertex[e.j]) {
                 int old_vertex = has_vertex[e.i] ? e.i : e.j;
                 int new_vertex = has_vertex[e.i] ? e.j : e.i;

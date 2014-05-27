@@ -38,7 +38,7 @@ ExternalProject_Get_Property(dake binary_dir)
 include_directories(${binary_dir}/include /usr/include/eigen3)
 link_directories(${binary_dir})
 
-add_executable(cg2p1 main.cpp cloud.cpp window.cpp render_output.cpp shader_sources.cpp kd_tree.cpp)
+add_executable(cg2p1 main.cpp cloud.cpp window.cpp render_output.cpp shader_sources.cpp kd_tree.cpp rng.cpp)
 if(WIN32)
     target_link_libraries(cg2p1 libdake.a ${OPENGL_LIBRARIES} /c/MinGW/bin/glew32.dll glew32.lib)
 else(WIN32)
