@@ -428,76 +428,54 @@ void cloud::recalc_normals(int k, bool orientation)
 
 
     rng r(*this, k);
-    r.sort();
+
+    std::vector<std::vector<rng::edge>> rng_point_edges(point_count);
+    for (const rng::edge &e: r) {
+        rng_point_edges[e.i].push_back(e);
+        rng_point_edges[e.j].push_back(e);
+    }
 
 
     init_progress("MST (%p %)", point_count);
 
     // Now use Prim-Dijkstra for finding a minimal spanning tree
     bool *has_vertex = static_cast<bool *>(calloc(point_count, sizeof *has_vertex));
+    std::priority_queue<rng::edge, std::vector<rng::edge>, rng::edge_compare_backwards> st_point_edges;
     std::vector<rng::edge> st_edges;
     st_edges.reserve(point_count - 1);
 
     // Just start at some random point
     has_vertex[0] = true;
 
-    size_t rebuild_counter = 0;
-    for (size_t vertices_found = 1; vertices_found < point_count; vertices_found++) {
-        // I'd like to cull inner edges of the spanning tree afterwards so
-        // they don't have to be searched here; however, std::remove_if() is
-        // slow on std::vector (which is no surprise, but someone whom I
-        // thought I could trust told me otherwise (that the cache could
-        // handle it all)), but using std::list (or something similar) makes
-        // std::sort() require operator-() on std::pair<>. Using std::set to
-        // avoid the std::sort() does not like my comparison lambda, so this
-        // would require an own class as well. An own class on the other
-        // hand would not have access to the rng map.
-        // Oh, and just to be clear, not using a single container for all edges
-        // but rather a container per point and then joining them into a
-        // container of "available" edges as the points are visited did not work
-        // out so well (it was not faster for me and the result was wrong, so I
-        // did not try fixing it and went back to this version).
+    for (const rng::edge &e: rng_point_edges[0]) {
+        st_point_edges.push(e);
+    }
 
-        // Threading the following loop yields horrible results
-        rng::edge new_edge(0, 0, HUGE_VALF);
-        for (const rng::edge &e: r) {
-            if (has_vertex[e.i] ^ has_vertex[e.j]) {
-                new_edge = e;
+    for (size_t vertices_found = 1; vertices_found < point_count; vertices_found++) {
+        const rng::edge *new_edge;
+        do {
+            if (st_point_edges.empty()) {
+                new_edge = nullptr;
                 break;
             }
-        }
 
-        if (new_edge.i == new_edge.j) {
+            new_edge = &st_point_edges.top();
+            st_point_edges.pop();
+        } while (has_vertex[new_edge->i] && has_vertex[new_edge->j]);
+
+        if (!new_edge) {
             reset_progress();
             std::stringstream msg;
             msg << "The constructed RNG graph has multiple components (failed at " << vertices_found << " of " << point_count << " points); try increasing k (the neighbor count for the nearest neighbor search)";
             throw std::logic_error(msg.str());
         }
 
-        st_edges.push_back(new_edge);
-        int new_vertex = has_vertex[new_edge.i] ? new_edge.j : new_edge.i;
+        st_edges.push_back(*new_edge);
+        int new_vertex = has_vertex[new_edge->i] ? new_edge->j : new_edge->i;
         has_vertex[new_vertex] = true;
 
-        if (++rebuild_counter >= 1024) {
-            rebuild_counter = 0;
-
-            // Okay, above I said I won't to std::remove_if(). But I found out
-            // I need to, as it gets really slow with some models (dragon.ply,
-            // I'm looking at you) otherwise. So do it only sometimes and
-            // rebuild the vector instead of using std::remove_if().
-            std::vector<rng::edge> rebuilt_rng;
-            // Some memory overhead, but who cares
-            rebuilt_rng.reserve(r.edges().size());
-            // This only takes edges which are not inner edges of the spanning
-            // tree calculated so far
-            // (doing this in the background does not help btw)
-            for (const rng::edge &e: r) {
-                if (!has_vertex[e.i] || !has_vertex[e.j]) {
-                    rebuilt_rng.push_back(e);
-                }
-            }
-
-            r.edges() = std::move(rebuilt_rng);
+        for (const rng::edge &e: rng_point_edges[new_vertex]) {
+            st_point_edges.push(e);
         }
 
         announce_progress(vertices_found + 1);

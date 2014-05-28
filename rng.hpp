@@ -27,6 +27,10 @@ class rng {
             bool operator==(const edge &e) const { return (i == e.i) && (j == e.j); }
         };
 
+        struct edge_compare_backwards {
+            bool operator()(const edge &e1, const edge &e2) { return e2 < e1; }
+        };
+
 
         rng(cloud &c, int k);
 
