@@ -168,6 +168,7 @@ window::window(void):
     }
     // (buttons and stuff)
     store = new QPushButton("Store this cloud");
+    unload = new QPushButton("Unload this cloud");
     unify = new QPushButton("Unify all clouds");
     unify_res = new QDoubleSpinBox;
     unify_res->setDecimals(4);
@@ -228,6 +229,7 @@ window::window(void):
     l2->addWidget(load);
     l2->addWidget(clouds);
     l2->addWidget(store);
+    l2->addWidget(unload);
     l2->addWidget(unify);
     l2->addWidget(unify_res);
     l2->addWidget(f[0]);
@@ -290,6 +292,7 @@ window::window(void):
     connect(unify, SIGNAL(pressed()), this, SLOT(do_unify()));
     connect(load, SIGNAL(pressed()), this, SLOT(load_cloud()));
     connect(store, SIGNAL(pressed()), this, SLOT(store_cloud()));
+    connect(unload, SIGNAL(pressed()), this, SLOT(unload_cloud()));
     connect(cull, SIGNAL(pressed()), this, SLOT(do_cull()));
     connect(renormal, SIGNAL(pressed()), this, SLOT(recalc_normals()));
 
@@ -330,6 +333,7 @@ window::~window(void)
     delete smooth_points;
     delete unify_res;
     delete unify;
+    delete unload;
     delete store;
     delete clouds;
     delete load;
@@ -430,6 +434,32 @@ void window::store_cloud(void)
     }
 
     // accept jesus
+}
+
+
+void window::unload_cloud(void)
+{
+    if (clouds->currentIndex() < 0) {
+        return;
+    }
+
+    // The above code with the Jesus stuff and whatnot is two weeks old by now.
+    // I have matured in the meantime and outgrown such lowly jokes.
+    const cloud *c = reinterpret_cast<const cloud *>(static_cast<uintptr_t>(clouds->currentData().value<qulonglong>()));
+
+    for (auto it = cm.clouds().begin(); it != cm.clouds().end(); ++it) {
+        if (&*it == c) {
+            cm.clouds().erase(it);
+            clouds->removeItem(clouds->currentIndex());
+            gl->invalidate();
+            return;
+        }
+    }
+
+    QMessageBox::critical(this, "Error", QString("Could not find ") + QString(c->name().c_str()) + QString(" in the list of clouds."));
+
+
+    // but seriously, wtf qt
 }
 
 
