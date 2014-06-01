@@ -6,7 +6,7 @@
 #include <climits>
 #include <cmath>
 #include <iterator>
-#include <queue>
+#include <set>
 #include <utility>
 #include <vector>
 #include <dake/math/matrix.hpp>
@@ -16,48 +16,6 @@
 
 #include "cloud.hpp"
 #include "point.hpp"
-
-
-template<typename T>
-class i_hate_the_priority_queue {
-    // it always performs magic and it always does the wrong thing
-    public:
-        i_hate_the_priority_queue(void) {}
-        i_hate_the_priority_queue(size_t max_size): ms(max_size) {}
-
-        bool empty(void) const { return c.empty(); }
-        bool full(void) const { return c.size() >= ms; }
-        size_t size(void) const { return c.size(); }
-
-        const T &top(void) const { return c.back(); }
-        const T &bottom(void) const { return c.front(); }
-
-        void pop_top(void) { c.pop_back(); }
-        void pop_bottom(void) { c.pop_front(); }
-
-        void push(const T &v)
-        {
-            if (c.size() >= ms) {
-                if (!(c.front() < v)) {
-                    return;
-                }
-                c.pop_front();
-            }
-            for (auto it = c.begin(); it != c.end(); it++) {
-                if (!(*it < v)) {
-                    c.insert(it, v);
-                    return;
-                }
-            }
-
-            c.push_back(v);
-        }
-
-
-    private:
-        std::deque<T> c;
-        size_t ms = SIZE_MAX;
-};
 
 
 template<unsigned K>
@@ -74,8 +32,28 @@ class kd_tree_node {
 
             nearest_neighbor(const point *p, float d): pt(p), dist(d) {}
 
-            // Inverse operation: The smaller, the better
-            bool operator<(const nearest_neighbor &nn) const { return dist > nn.dist; }
+            // This function is sufficient for std::set. As std::set considers
+            // two objects a, b equal iff !(a < b) && !(b < a), we have to make
+            // sure not to compare neighbors based on their distance alone.
+            bool operator<(const nearest_neighbor &nn) const
+            {
+                if (dist != nn.dist) {
+                    return dist < nn.dist;
+                }
+
+                for (int i = 0; i < pt->position.rows; i++) {
+                    // Floating point equality comparisons are fine here, as we
+                    // want to check whether they are the *same* points, not
+                    // just equal. Any difference (and be it yet so small) is
+                    // fine.
+                    if (pt->position[i] != nn.pt->position[i]) {
+                        return pt->position[i] < nn.pt->position[i];
+                    }
+                }
+
+                // Well then, they are indeed equal.
+                return false;
+            }
         };
 
         kd_tree_node(std::vector<const point *> &points, unsigned start, unsigned end, unsigned max_depth, unsigned min_points):
@@ -200,19 +178,37 @@ class kd_tree_node {
 
         void dump(unsigned level_indentation = 2, unsigned indentation = 0) const;
 
-        void knn_step(i_hate_the_priority_queue<nearest_neighbor> &queue, const vector &position) const
+        // I need the nearest neighbors, but I also need fast access to the
+        // farthest nearest neighbor -- therefore, I cannot use
+        // std::priority_queue (maybe I can, but using std::set is easier).
+        void knn_step(std::set<nearest_neighbor> &queue, const vector &position, unsigned neighbors) const
         {
             if (leaf()) {
                 for (const point *pt: *this) {
-                    queue.push(nearest_neighbor(pt, (position - pt->position).length()));
+                    bool full = queue.size() >= neighbors;
+                    float dist = (position - pt->position).length();
+
+                    // Add point to the nearest neighbor if the queue is not yet
+                    // full or it is nearer than the farthest neighbor
+                    if (!full || (dist < queue.rbegin()->dist)) {
+                        queue.emplace(pt, dist);
+
+                        if (full) {
+                            auto end_it = queue.end();
+                            queue.erase(--end_it);
+                        }
+                    }
                 }
             } else {
                 bool in_left = position[split_dim] <= split_val;
 
-                (in_left ? left_child : right_child)->knn_step(queue, position);
+                (in_left ? left_child : right_child)->knn_step(queue, position, neighbors);
 
-                if (!queue.full() || (fabsf(position[split_dim] - split_val) < queue.bottom().dist)) {
-                    (in_left ? right_child : left_child)->knn_step(queue, position);
+                // Visit the other child as well if the neighbor queue is not
+                // yet full or it may contain elements which are nearer than the
+                // farthest neighbor
+                if ((queue.size() < neighbors) || (fabsf(position[split_dim] - split_val) < queue.rbegin()->dist)) {
+                    (in_left ? right_child : left_child)->knn_step(queue, position, neighbors);
                 }
             }
         }
@@ -254,15 +250,14 @@ class kd_tree {
         {
             assert(neighbors > 0);
 
-            i_hate_the_priority_queue<typename kd_tree_node<K>::nearest_neighbor> queue(neighbors);
+            std::set<typename kd_tree_node<K>::nearest_neighbor> queue;
 
-            root_node->knn_step(queue, position);
+            root_node->knn_step(queue, position, neighbors);
 
             std::vector<const point *> ret;
             ret.reserve(queue.size());
-            while (!queue.empty()) {
-                ret.push_back(queue.top().pt);
-                queue.pop_top();
+            for (const auto &nn: queue) {
+                ret.push_back(nn.pt);
             }
 
             return ret;

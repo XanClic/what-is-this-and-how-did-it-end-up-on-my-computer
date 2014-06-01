@@ -28,7 +28,7 @@ class rng {
         };
 
         struct edge_compare_backwards {
-            bool operator()(const edge &e1, const edge &e2) { return e2 < e1; }
+            bool operator()(const edge &e1, const edge &e2) const { return e2 < e1; }
         };
 
 
