@@ -31,6 +31,7 @@ class window:
         void do_unify(void);
         void load_cloud(void);
         void store_cloud(void);
+        void unload_cloud(void);
         void do_cull(void);
         void recalc_normals(void);
 
@@ -44,7 +45,7 @@ class window:
         QCheckBox *smooth_points, *lighting, *colored, *rng, *renormal_inv;
         QDoubleSpinBox *point_size, *normal_length, *fov, *ld_x, *ld_y, *ld_z, *cull_ratio;
         QLabel *point_size_label, *normal_length_label, *fov_label, *ld, *k_label, *cull_ratio_label;
-        QPushButton *unify, *load, *store, *cull, *renormal;
+        QPushButton *unify, *load, *store, *unload, *cull, *renormal;
         QDoubleSpinBox *unify_res;
         QComboBox *clouds;
         QSpinBox *k;
