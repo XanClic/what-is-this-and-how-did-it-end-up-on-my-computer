@@ -25,6 +25,7 @@ enum program_flag_bits {
     BIT_LIGHTING,
     BIT_NORMALS,
     BIT_COLORED,
+    BIT_SMOOTH,
 
     PROGRAM_FLAG_COUNT
 };
@@ -33,6 +34,7 @@ enum program_flags {
     LIGHTING = 1 << BIT_LIGHTING,
     NORMALS  = 1 << BIT_NORMALS,
     COLORED  = 1 << BIT_COLORED,
+    SMOOTH   = 1 << BIT_SMOOTH,
 
     PROGRAM_COUNT = 1 << PROGRAM_FLAG_COUNT,
 
@@ -49,7 +51,7 @@ static int shader_flag_mask(shader::type t)
     switch (t) {
         case shader::VERTEX:   return LIGHTING | COLORED;
         case shader::GEOMETRY: return NORMALS;
-        case shader::FRAGMENT: return 0;
+        case shader::FRAGMENT: return SMOOTH;
         default:               throw std::invalid_argument("Invalid argument given to shader_flag_mask()");
     }
 }
@@ -75,10 +77,12 @@ render_output::~render_output(void)
 gl::program *render_output::select_program(bool normals)
 {
     bool tl = lighting && light_dir.length();
+    bool ts = smooth   && !normals;
 
     gl::program *selected = &prgs[(tl      * LIGHTING) |
                                   (normals * NORMALS)  |
-                                  (colored * COLORED)];
+                                  (colored * COLORED)  |
+                                  (ts      * SMOOTH)];
 
     if (selected != current_prg) {
         selected->use();
@@ -97,24 +101,6 @@ void render_output::invalidate(void)
 void render_output::change_point_size(double sz)
 {
     glPointSize(sz);
-}
-
-
-void render_output::change_point_smoothness(int smooth)
-{
-    if (smooth) {
-        glEnable(GL_ALPHA_TEST);
-        glAlphaFunc(GL_NOTEQUAL, 0.f);
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glEnable(GL_POINT_SMOOTH);
-        glHint(GL_POINT_SMOOTH_HINT, GL_NICEST);
-    } else {
-        glDisable(GL_ALPHA_TEST);
-        glDisable(GL_BLEND);
-        glDisable(GL_POINT_SMOOTH);
-    }
-
 }
 
 
