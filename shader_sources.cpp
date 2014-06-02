@@ -12,6 +12,7 @@ enum program_flag_bits {
     BIT_LIGHTING,
     BIT_NORMALS,
     BIT_COLORED,
+    BIT_SMOOTH,
 
     PROGRAM_FLAG_COUNT
 };
@@ -20,6 +21,7 @@ enum program_flags {
     LIGHTING = 1 << BIT_LIGHTING,
     NORMALS  = 1 << BIT_NORMALS,
     COLORED  = 1 << BIT_COLORED,
+    SMOOTH   = 1 << BIT_SMOOTH,
 
     PROGRAM_COUNT = 1 << PROGRAM_FLAG_COUNT,
 
@@ -187,6 +189,21 @@ const shader_source shader_sources[] = {
 
                   0,
                   "fragment shader"),
+
+
+    shader_source(shader::FRAGMENT,
+
+                  "#version 150 core\n"
+                  "in vec3 gf_color;\n"
+                  "out vec4 out_color;\n"
+                  "void main(void)\n"
+                  "{\n"
+                  "    if (length(gl_PointCoord - vec2(0.5, 0.5)) > 0.25) discard;\n"
+                  "    out_color = vec4(gf_color, 1.0);\n"
+                  "}",
+
+                  SMOOTH,
+                  "smooth fragment shader"),
 
 
     shader_source(shader::FRAGMENT,

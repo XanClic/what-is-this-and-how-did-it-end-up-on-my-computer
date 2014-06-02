@@ -27,8 +27,6 @@ class render_output:
         render_output(QGLFormat fmt, QDoubleSpinBox *point_size_widget, QWidget *parent = nullptr);
         ~render_output(void);
 
-        dake::gl::program *select_program(bool normals);
-
         bool lighting_enabled(void) const
         { return lighting; }
         void enable_lighting(bool enable)
@@ -59,11 +57,16 @@ class render_output:
         dake::math::vec3 &light_direction(void)
         { reload_uniforms = true; return light_dir; }
 
+        bool point_smoothness(void) const
+        { return smooth; }
+        void set_point_smoothness(bool s)
+        { smooth = s; reload_uniforms = true; }
+
         void invalidate(void);
 
     public slots:
         void change_point_size(double sz);
-        void change_point_smoothness(int smooth);
+        void change_point_smoothness(int smooth) { set_point_smoothness(smooth); }
         void change_lighting(int lighting) { enable_lighting(lighting); }
         void change_colors(int colored) { enable_colors(colored); }
         void change_normal_length(double length) { set_normal_length(length); }
@@ -89,7 +92,8 @@ class render_output:
         QTimer *redraw_timer;
         dake::math::mat4 proj, mv;
         dake::math::vec3 light_dir;
-        bool lighting = false, colored = true, rotate_camera = false, move_camera = false;
+        bool lighting = false, colored = true, smooth = false;
+        bool rotate_camera = false, move_camera = false;
         bool reload_uniforms = true;
         float normlen = 0.f;
         float rot_l_x, rot_l_y;
@@ -98,7 +102,9 @@ class render_output:
         bool show_rng = false;
         int rng_k = 5;
 
+        dake::gl::program *select_program(bool normals);
         void recalc_rng(void);
+
 };
 
 #endif
