@@ -331,20 +331,14 @@ void render_output::mouseReleaseEvent(QMouseEvent *evt)
 
 void render_output::mouseMoveEvent(QMouseEvent *evt)
 {
-    // No, actually I don't even want to know.
-#ifdef __MINGW32__
     int dx = evt->x() - rot_l_x;
     int dy = evt->y() - rot_l_y;
-#else
-    int dx = rot_l_x - evt->x();
-    int dy = rot_l_y - evt->y();
-#endif
 
     if (rotate_camera) {
         mv = mat4::identity().rotated(dx / 4.f * static_cast<float>(M_PI) / 180.f, vec3(0.f, 1.f, 0.f)) * mv;
         mv = mat4::identity().rotated(dy / 4.f * static_cast<float>(M_PI) / 180.f, vec3(1.f, 0.f, 0.f)) * mv;
     } else {
-        mv = mat4::identity().translated(vec3(dx / 100.f, -dy / 100.f, 0.f)) * mv;
+        mv = mat4::identity().translated(vec3(-dx / 100.f, dy / 100.f, 0.f)) * mv;
     }
 
     reload_uniforms = true;
