@@ -11,29 +11,16 @@ find_package(OpenGL REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Core Gui OpenGL)
 find_package(Eigen3 REQUIRED)
 
-if(WIN32)
-    ExternalProject_Add(
-        dake
-        GIT_REPOSITORY git://github.com/XanClic/dake.git
-        GIT_TAG origin/master
-        SOURCE_DIR dake
-        CMAKE_COMMAND true
-        BUILD_COMMAND make -f Makefile.windows
-        BINARY_DIR dake
-        INSTALL_COMMAND true
-    )
-else(WIN32)
-    ExternalProject_Add(
-        dake
-        GIT_REPOSITORY git://github.com/XanClic/dake.git
-        GIT_TAG origin/master
-        SOURCE_DIR dake
-        CMAKE_COMMAND true
-        BUILD_COMMAND make -j 4
-        BINARY_DIR dake
-        INSTALL_COMMAND true
-    )
-endif(WIN32)
+ExternalProject_Add(
+    dake
+    GIT_REPOSITORY git://github.com/XanClic/dake.git
+    GIT_TAG origin/master
+    SOURCE_DIR dake
+    CMAKE_COMMAND true
+    BUILD_COMMAND make
+    BINARY_DIR dake
+    INSTALL_COMMAND true
+)
 
 ExternalProject_Get_Property(dake binary_dir)
 
