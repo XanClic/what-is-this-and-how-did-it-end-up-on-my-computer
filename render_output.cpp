@@ -321,8 +321,9 @@ void render_output::mouseMoveEvent(QMouseEvent *evt)
     int dy = evt->y() - rot_l_y;
 
     if (rotate_camera) {
-        mv = mat4::identity().rotated(dx / 4.f * static_cast<float>(M_PI) / 180.f, vec3(0.f, 1.f, 0.f)) * mv;
-        mv = mat4::identity().rotated(dy / 4.f * static_cast<float>(M_PI) / 180.f, vec3(1.f, 0.f, 0.f)) * mv;
+        mv = mat4::identity().rotated(dy / 4.f * static_cast<float>(M_PI) / 180.f, vec3(1.f, 0.f, 0.f))
+                             .rotated(dx / 4.f * static_cast<float>(M_PI) / 180.f, vec3(0.f, 1.f, 0.f))
+                            * mv;
     } else {
         mv = mat4::identity().translated(vec3(-dx / 100.f, dy / 100.f, 0.f)) * mv;
     }
