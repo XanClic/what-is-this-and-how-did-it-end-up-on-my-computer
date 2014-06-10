@@ -17,6 +17,7 @@
 #include <QFrame>
 #include <QComboBox>
 #include <QProgressBar>
+#include <QScrollArea>
 
 #include "cloud.hpp"
 #include "render_output.hpp"
@@ -257,8 +258,6 @@ window::window(void):
     l2->addWidget(k_label);
     l2->addWidget(k);
     l2->addWidget(rng);
-    l2->addStretch();
-    l2->addWidget(global_progress);
 
     int highest = fls(QGLFormat::openGLVersionFlags());
     if (!highest)
@@ -296,9 +295,22 @@ window::window(void):
     connect(cull, SIGNAL(pressed()), this, SLOT(do_cull()));
     connect(renormal, SIGNAL(pressed()), this, SLOT(recalc_normals()));
 
+    options_widget = new QWidget;
+    options_widget->setLayout(l2);
+
+    options = new QScrollArea;
+    options->setWidget(options_widget);
+    options->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    options->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    options->setSizeAdjustPolicy(QAbstractScrollArea::AdjustToContentsOnFirstShow);
+
+    l3 = new QVBoxLayout;
+    l3->addWidget(options, 1);
+    l3->addWidget(global_progress);
+
     l1 = new QHBoxLayout;
     l1->addWidget(gl, 1);
-    l1->addLayout(l2);
+    l1->addLayout(l3);
 
     i_hate_qt->setLayout(l1);
 }
@@ -307,9 +319,12 @@ window::~window(void)
 {
     delete l1;
     delete l2;
+    delete l3;
+    delete global_progress;
+    delete options;
+    delete options_widget;
     delete ldl;
     delete gl;
-    delete global_progress;
     delete rng;
     delete k;
     delete k_label;
