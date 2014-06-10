@@ -176,8 +176,11 @@ class cloud {
 
 class cloud_manager {
     public:
-        cloud_manager(void): c(new std::list<cloud>) {}
+        cloud_manager(void): c(new std::list<cloud>), ro(nullptr) {}
         ~cloud_manager(void) { delete c; }
+
+        void set_render_output(render_output *rnd_out)
+        { ro = rnd_out; }
 
         const std::list<cloud> &clouds(void) const
         { return *c; }
@@ -186,11 +189,12 @@ class cloud_manager {
 
         void load_new(std::ifstream &s, const std::string &name = "(unnamed)");
         void unify(float resolution, const std::string &name = "(unnamed)");
-        void icp(render_output *ro, size_t m, size_t n, float p);
+        void icp(size_t m, size_t n, float p);
 
 
     private:
         std::list<cloud> *c;
+        render_output *ro;
 };
 
 #endif
