@@ -513,6 +513,8 @@ void cloud::recalc_normals(int k, bool orientation)
 
     free(has_vertex);
 
+    varr_valid = rng_varr_valid = density_valid = false;
+
 
     reset_progress();
 }
@@ -554,7 +556,7 @@ struct correspondence {
 };
 
 
-void cloud_manager::icp(size_t m, size_t n, float p)
+void cloud_manager::icp(render_output *ro, size_t m, size_t n, float p)
 {
     if (c->size() != 2) {
         throw std::invalid_argument("ICP can only be done iff exactly two point clouds are loaded");
@@ -664,6 +666,8 @@ void cloud_manager::icp(size_t m, size_t n, float p)
         c->front().transformation() = mat4::identity();
         c->back().transformation() = new_trans;
 
+
+        ro->invalidate();
 
         announce_progress(iteration);
     }

@@ -18,6 +18,7 @@
 #include <dake/gl/vertex_attrib.hpp>
 
 #include "point.hpp"
+#include "render_output.hpp"
 
 
 #ifndef FE_DOWNWARD
@@ -185,7 +186,7 @@ class cloud_manager {
 
         void load_new(std::ifstream &s, const std::string &name = "(unnamed)");
         void unify(float resolution, const std::string &name = "(unnamed)");
-        void icp(size_t m, size_t n, float p);
+        void icp(render_output *ro, size_t m, size_t n, float p);
 
 
     private:

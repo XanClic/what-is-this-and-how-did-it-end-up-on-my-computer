@@ -5,6 +5,7 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <QApplication>
 #include <QGLWidget>
 #include <QBoxLayout>
 #include <QWidget>
@@ -46,6 +47,7 @@ void announce_progress(int amount)
 
     if (abs(amount - last_update) >= minimum_progress) {
         global_progress->setValue(last_update = amount);
+        qApp->processEvents();
     }
 }
 
@@ -560,7 +562,7 @@ void window::recalc_normals(void)
 void window::do_icp(void)
 {
     try {
-        cm.icp(icp_m->value(), icp_n->value(), icp_p->value());
+        cm.icp(gl, icp_m->value(), icp_n->value(), icp_p->value());
     } catch (const std::exception &e) {
         QMessageBox::critical(this, "Error", QString("Could not do ICP: ") + QString(e.what()));
     }
