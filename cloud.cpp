@@ -617,8 +617,9 @@ void cloud_manager::icp(render_output *ro, size_t m, size_t n, float p)
 
 
         // Transform all points to the global coordinate system; then register
-        // them, set the second cloud's transformation matrix accordingly and
-        // reset the first one's to the identity matrix
+        // them in global coordinates and apply the first cloud's original
+        // transformation onto the calculated result to obtain the new
+        // transformation for the second cloud.
 
         // Points from the first cloud
         auto p = map<vec3>(correspondences, [&](const correspondence &cr) { return vec3(c->front().transformation() * cr.p1); });
@@ -675,9 +676,7 @@ void cloud_manager::icp(render_output *ro, size_t m, size_t n, float p)
         mat4 new_trans(R);
         new_trans[3] = vec4(t.x(), t.y(), t.z(), 1.f);
 
-
-        c->front().transformation() = mat4::identity();
-        c->back().transformation() = new_trans;
+        c->back().transformation() = new_trans * c->front().transformation();
 
 
         ro->invalidate();
