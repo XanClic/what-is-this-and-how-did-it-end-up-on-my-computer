@@ -6,6 +6,7 @@
 #include <fstream>
 #include <list>
 #include <queue>
+#include <random>
 #include <stdexcept>
 #include <sstream>
 #include <string>
@@ -537,4 +538,135 @@ void cloud_manager::unify(float resolution, const std::string &name)
     delete c;
     c = new std::list<cloud>;
     c->push_back(unified);
+}
+
+
+struct correspondence {
+    vec4 p1, p2;
+    float distance;
+
+    correspondence(void) {}
+    correspondence(const vec3 &pt1, const vec3 &pt2): p1(pt1), p2(pt2)
+    { p1.w() = 1.f; p2.w() = 1.f; distance = (p1 - p2).length(); }
+
+    bool operator<(const correspondence &c) const
+    { return distance < c.distance; }
+};
+
+
+void cloud_manager::icp(size_t m, size_t n, float p)
+{
+    if (c->size() != 2) {
+        throw std::invalid_argument("ICP can only be done iff exactly two point clouds are loaded");
+    }
+
+    if (n > c->front().points().size()) {
+        n = c->front().points().size();
+    } else if (!n) {
+        throw std::invalid_argument("n must be positive");
+    }
+
+    if (p < 0) {
+        p = 0;
+    } else if (p >= 1) {
+        throw std::invalid_argument("p may not be 100 % or more");
+    }
+
+    init_progress("ICP (%p %)", m);
+
+    std::vector<correspondence> correspondences;
+    std::vector<const point *> remaining_points;
+    std::default_random_engine rng;
+
+    kd_tree<3> kdt(c->back());
+
+    for (size_t iteration = 0; iteration < m; iteration++) {
+        correspondences.clear();
+        correspondences.reserve(n);
+
+        remaining_points.clear();
+        remaining_points.reserve(c->front().points().size());
+
+        for (const point &pt: c->front().points()) {
+            remaining_points.push_back(&pt);
+        }
+
+        mat4 trans(c->back().transformation().transposed());
+        trans.transposed_invert();
+        trans *= c->front().transformation();
+
+        for (size_t i = 0; i < n; i++) {
+            size_t idx = std::uniform_int_distribution<size_t>(0, remaining_points.size() - 1)(rng);
+            const point *pt = remaining_points[idx];
+
+            vec3 trans_coord(trans * vec4(pt->position.x(), pt->position.y(), pt->position.z(), 1.f));
+
+            const point *nn = kdt.knn(trans_coord, 1).front();
+
+            correspondences.emplace_back(pt->position, nn->position);
+        }
+
+        std::sort(correspondences.begin(), correspondences.end());
+
+        size_t rem = n - static_cast<size_t>(p * n);
+        if (!rem) {
+            rem = 1;
+        }
+
+        correspondences.resize(rem);
+
+
+        // Transform all points to the global coordinate system; then register
+        // them, set the second cloud's transformation matrix accordingly and
+        // reset the first one's to the identity matrix
+
+        // Points from the first cloud
+        auto p = map<vec3>(correspondences, [&](const correspondence &cr) { return vec3(c->front().transformation() * cr.p1); });
+        // Points from the second cloud (TODO: As these are the nearest
+        // neighbor from the first cloud, there may be duplicates; maybe this is
+        // is undesirable)
+        auto q = map<vec3>(correspondences, [&](const correspondence &cr) { return vec3(c->back().transformation() * cr.p2); });
+
+        assert(p.size() == rem);
+        assert(q.size() == rem);
+
+        vec3 p_centroid = inject(p, sum) / rem;
+        vec3 q_centroid = inject(q, sum) / rem;
+
+        auto p_rel = map(p, [&](const vec3 &pi) { return pi - p_centroid; });
+        auto q_rel = map(q, [&](const vec3 &qi) { return qi - q_centroid; });
+
+        mat3 H = inject(map<mat3>(range<>(0, rem - 1), [&](int i) { return q_rel[i] * p_rel[i].transposed(); }), sum) / rem;
+
+        // SVD
+        Eigen::Matrix3f H_tn(H * H.transposed());
+        Eigen::EigenSolver<Eigen::Matrix3f> H_tn_solver(H_tn);
+        mat3 U(mat3::from_data(H_tn_solver.eigenvectors().real().data()));
+
+        Eigen::Matrix3f H_nt(H.transposed() * H);
+        Eigen::EigenSolver<Eigen::Matrix3f> H_nt_solver(H_nt);
+        mat3 V(mat3::from_data(H_nt_solver.eigenvectors().real().data()).transposed());
+
+        mat3 diag = mat3::diagonal(1.f, 1.f, (V * U).det());
+
+        mat3 R = V * diag * U;
+        if (R.det() < 0.f) {
+            diag[2][2] = -diag[2][2];
+            R = V * diag * U;
+        }
+
+        vec3 t = p_centroid - R * q_centroid;
+
+        mat4 new_trans(R);
+        new_trans[3] = vec4(t.x(), t.y(), t.z(), 1.f);
+
+
+        c->front().transformation() = mat4::identity();
+        c->back().transformation() = new_trans;
+
+
+        announce_progress(iteration);
+    }
+
+    reset_progress();
 }
