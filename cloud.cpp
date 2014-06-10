@@ -578,33 +578,49 @@ void cloud_manager::icp(size_t m, size_t n, float p)
     init_progress("ICP (%p %)", m);
 
     std::vector<correspondence> correspondences;
-    std::vector<const point *> remaining_points;
+    std::vector<const point *> point_selection;
     std::default_random_engine rng(std::chrono::system_clock::now().time_since_epoch().count());
 
     kd_tree<3> kdt(c->back());
 
-    for (size_t iteration = 0; iteration < m; iteration++) {
-        correspondences.clear();
-        correspondences.reserve(n);
+    int thread_count = std::thread::hardware_concurrency();
 
-        remaining_points.clear();
-        remaining_points.reserve(c->front().points().size());
+    for (size_t iteration = 0; iteration < m; iteration++) {
+        correspondences.resize(n);
+
+        point_selection.clear();
+        point_selection.reserve(c->front().points().size());
 
         for (const point &pt: c->front().points()) {
-            remaining_points.push_back(&pt);
+            point_selection.push_back(&pt);
         }
+
+        // Choose n points at random
+        std::shuffle(point_selection.begin(), point_selection.end(), rng);
+        point_selection.resize(n);
 
         mat4 trans(c->back().transformation().inverse() * c->front().transformation());
 
-        for (size_t i = 0; i < n; i++) {
-            size_t idx = std::uniform_int_distribution<size_t>(0, remaining_points.size() - 1)(rng);
-            const point *pt = remaining_points[idx];
+        // Now, thread hard (find nearest neighbors in other cloud)
+        auto find_nn_thread = [&](int thread_index) {
+            for (size_t i = thread_index; i < n; i += thread_count) {
+                const point *pt = point_selection[i];
 
-            vec3 trans_coord(trans * vec4(pt->position.x(), pt->position.y(), pt->position.z(), 1.f));
+                vec3 trans_coord(trans * vec4(pt->position.x(), pt->position.y(), pt->position.z(), 1.f));
 
-            const point *nn = kdt.knn(trans_coord, 1).front();
+                const point *nn = kdt.knn(trans_coord, 1).front();
 
-            correspondences.emplace_back(pt->position, nn->position);
+                correspondences[i] = correspondence(pt->position, nn->position);
+            }
+        };
+
+        std::thread *threads[thread_count];
+        for (int i = 0; i < thread_count; i++) {
+            threads[i] = new std::thread(find_nn_thread, i);
+        }
+        for (int i = 0; i < thread_count; i++) {
+            threads[i]->join();
+            delete threads[i];
         }
 
         std::sort(correspondences.begin(), correspondences.end());
@@ -618,9 +634,9 @@ void cloud_manager::icp(size_t m, size_t n, float p)
 
 
         // Transform all points to the global coordinate system; then register
-        // them in global coordinates and apply the first cloud's original
+        // them in global coordinates and apply the second cloud's original
         // transformation onto the calculated result to obtain the new
-        // transformation for the second cloud.
+        // transformation for this second cloud.
 
         // Points from the first cloud
         auto p = map<vec3>(correspondences, [&](const correspondence &cr) { return vec3(c->front().transformation() * cr.p1); });
@@ -640,36 +656,18 @@ void cloud_manager::icp(size_t m, size_t n, float p)
 
         mat3 H = inject(map<mat3>(range<>(0, rem - 1), [&](int i) { return q_rel[i] * p_rel[i].transposed(); }), sum) / rem;
 
-#define JUST_GIVE_IN_TO_EIGEN
-
-#if defined(USE_EIGEN_FOR_MANUAL_SVD_AND_FAIL_UTTERLY)
-        // SVD
-        Eigen::Matrix3f H_tn(H * H.transposed());
-        Eigen::EigenSolver<Eigen::Matrix3f> H_tn_solver(H_tn);
-        Eigen::Matrix3f H_tn_result(H_tn_solver.eigenvectors().real());
-        mat3 U(mat3::from_data(H_tn_result.data()));
-
-        Eigen::Matrix3f H_nt(H.transposed() * H);
-        Eigen::EigenSolver<Eigen::Matrix3f> H_nt_solver(H_nt);
-        Eigen::Matrix3f H_nt_result(H_nt_solver.eigenvectors().real());
-        mat3 Vt(mat3::from_data(H_nt_result.data()).transposed());
-#elif defined(USE_RUBY_FOR_MANUAL_SVD_AND_DONT_WORK_ON_WINDOWS_AND_BE_HORRIBLY_SLOW_ON_LINUX)
-        mat3 U(H.svd_U());
-        mat3 Vt(H.svd_V().transposed());
-#elif defined(JUST_GIVE_IN_TO_EIGEN)
         Eigen::Matrix3f EH(H);
         Eigen::JacobiSVD<Eigen::Matrix3f> svd(EH, Eigen::ComputeFullU | Eigen::ComputeFullV);
         Eigen::Matrix3f EU(svd.matrixU().real()), EV(svd.matrixV().real());
-        mat3 U(mat3::from_data(EU.data()));
-        mat3 Vt(mat3::from_data(EV.data()).transposed());
-#endif
+        mat3 Ut(mat3::from_data(EU.data()).transposed());
+        mat3 V(mat3::from_data(EV.data()));
 
-        mat3 diag = mat3::diagonal(1.f, 1.f, (Vt * U).det());
+        mat3 diag = mat3::diagonal(1.f, 1.f, (V * Ut).det());
 
-        mat3 R = Vt * diag * U;
+        mat3 R = V * diag * Ut;
         if (R.det() < 0.f) {
             diag[2][2] = -diag[2][2];
-            R = Vt * diag * U;
+            R = V * diag * Ut;
         }
 
         vec3 t = p_centroid - R * q_centroid;
@@ -677,7 +675,7 @@ void cloud_manager::icp(size_t m, size_t n, float p)
         mat4 new_trans(R);
         new_trans[3] = vec4(t.x(), t.y(), t.z(), 1.f);
 
-        c->back().transformation() = new_trans * c->front().transformation();
+        c->back().transformation() = new_trans * c->back().transformation();
 
 
         ro->invalidate();
