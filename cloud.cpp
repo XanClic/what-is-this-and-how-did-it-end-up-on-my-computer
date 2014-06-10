@@ -593,9 +593,7 @@ void cloud_manager::icp(render_output *ro, size_t m, size_t n, float p)
             remaining_points.push_back(&pt);
         }
 
-        mat4 trans(c->back().transformation().transposed());
-        trans.transposed_invert();
-        trans *= c->front().transformation();
+        mat4 trans(c->back().transformation().inverse() * c->front().transformation());
 
         for (size_t i = 0; i < n; i++) {
             size_t idx = std::uniform_int_distribution<size_t>(0, remaining_points.size() - 1)(rng);
@@ -640,21 +638,36 @@ void cloud_manager::icp(render_output *ro, size_t m, size_t n, float p)
 
         mat3 H = inject(map<mat3>(range<>(0, rem - 1), [&](int i) { return q_rel[i] * p_rel[i].transposed(); }), sum) / rem;
 
+#define JUST_GIVE_IN_TO_EIGEN
+
+#if defined(USE_EIGEN_FOR_MANUAL_SVD_AND_FAIL_UTTERLY)
         // SVD
         Eigen::Matrix3f H_tn(H * H.transposed());
         Eigen::EigenSolver<Eigen::Matrix3f> H_tn_solver(H_tn);
-        mat3 U(mat3::from_data(H_tn_solver.eigenvectors().real().data()));
+        Eigen::Matrix3f H_tn_result(H_tn_solver.eigenvectors().real());
+        mat3 U(mat3::from_data(H_tn_result.data()));
 
         Eigen::Matrix3f H_nt(H.transposed() * H);
         Eigen::EigenSolver<Eigen::Matrix3f> H_nt_solver(H_nt);
-        mat3 V(mat3::from_data(H_nt_solver.eigenvectors().real().data()).transposed());
+        Eigen::Matrix3f H_nt_result(H_nt_solver.eigenvectors().real());
+        mat3 Vt(mat3::from_data(H_nt_result.data()).transposed());
+#elif defined(USE_RUBY_FOR_MANUAL_SVD_AND_DONT_WORK_ON_WINDOWS_AND_BE_HORRIBLY_SLOW_ON_LINUX)
+        mat3 U(H.svd_U());
+        mat3 Vt(H.svd_V().transposed());
+#elif defined(JUST_GIVE_IN_TO_EIGEN)
+        Eigen::Matrix3f EH(H);
+        Eigen::JacobiSVD<Eigen::Matrix3f> svd(EH, Eigen::ComputeFullU | Eigen::ComputeFullV);
+        Eigen::Matrix3f EU(svd.matrixU().real()), EV(svd.matrixV().real());
+        mat3 U(mat3::from_data(EU.data()));
+        mat3 Vt(mat3::from_data(EV.data()).transposed());
+#endif
 
-        mat3 diag = mat3::diagonal(1.f, 1.f, (V * U).det());
+        mat3 diag = mat3::diagonal(1.f, 1.f, (Vt * U).det());
 
-        mat3 R = V * diag * U;
+        mat3 R = Vt * diag * U;
         if (R.det() < 0.f) {
             diag[2][2] = -diag[2][2];
-            R = V * diag * U;
+            R = Vt * diag * U;
         }
 
         vec3 t = p_centroid - R * q_centroid;
