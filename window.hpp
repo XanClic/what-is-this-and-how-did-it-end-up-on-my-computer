@@ -35,6 +35,7 @@ class window:
         void unload_cloud(void);
         void do_cull(void);
         void recalc_normals(void);
+        void do_icp(void);
 
     private:
         QWidget *i_hate_qt, *options_widget;
@@ -43,14 +44,14 @@ class window:
         QHBoxLayout *l1, *ldl;
         QVBoxLayout *l2, *l3;
         QScrollArea *options;
-        QFrame *f[6];
+        QFrame *f[7];
         QCheckBox *smooth_points, *lighting, *colored, *rng, *renormal_inv;
-        QDoubleSpinBox *point_size, *normal_length, *fov, *ld_x, *ld_y, *ld_z, *cull_ratio;
-        QLabel *point_size_label, *normal_length_label, *fov_label, *ld, *k_label, *cull_ratio_label;
-        QPushButton *unify, *load, *store, *unload, *cull, *renormal;
+        QDoubleSpinBox *point_size, *normal_length, *fov, *ld_x, *ld_y, *ld_z, *cull_ratio, *icp_p;
+        QLabel *point_size_label, *normal_length_label, *fov_label, *ld, *k_label, *cull_ratio_label, *icp_n_label, *icp_m_label, *icp_p_label;
+        QPushButton *unify, *load, *store, *unload, *cull, *renormal, *icp;
         QDoubleSpinBox *unify_res;
         QComboBox *clouds;
-        QSpinBox *k;
+        QSpinBox *k, *icp_n, *icp_m;
 };
 
 

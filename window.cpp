@@ -53,6 +53,7 @@ void reset_progress(void)
 {
     global_progress->reset();
 }
+// oh hi there welcome back
 
 
 static int fls(int mask)
@@ -212,6 +213,20 @@ window::window(void):
     k->setRange(1, INT_MAX);
     k->setValue(5);
     rng = new QCheckBox("Riemann graph");
+    icp = new QPushButton("ICP");
+    icp_n_label = new QLabel("N (reg. point count):");
+    icp_n = new QSpinBox;
+    icp_n->setRange(1, INT_MAX);
+    icp_n->setValue(42);
+    icp_p_label = new QLabel("p (cull percentage):");
+    icp_p = new QDoubleSpinBox;
+    icp_p->setRange(0, .99);
+    icp_p->setSingleStep(.01);
+    icp_p->setValue(.42);
+    icp_m_label = new QLabel("M (iterations):");
+    icp_m = new QSpinBox;
+    icp_m->setRange(1, INT_MAX);
+    icp_m->setValue(42);
 
     global_progress = new QProgressBar;
     global_progress->setTextVisible(true);
@@ -258,6 +273,14 @@ window::window(void):
     l2->addWidget(k_label);
     l2->addWidget(k);
     l2->addWidget(rng);
+    l2->addWidget(f[6]);
+    l2->addWidget(icp);
+    l2->addWidget(icp_n_label);
+    l2->addWidget(icp_n);
+    l2->addWidget(icp_p_label);
+    l2->addWidget(icp_p);
+    l2->addWidget(icp_m_label);
+    l2->addWidget(icp_m);
 
     int highest = fls(QGLFormat::openGLVersionFlags());
     if (!highest)
@@ -294,6 +317,21 @@ window::window(void):
     connect(unload, SIGNAL(pressed()), this, SLOT(unload_cloud()));
     connect(cull, SIGNAL(pressed()), this, SLOT(do_cull()));
     connect(renormal, SIGNAL(pressed()), this, SLOT(recalc_normals()));
+    connect(icp, SIGNAL(pressed()), this, SLOT(do_icp()));
+
+    options_widget = new QWidget;
+    options_widget->setLayout(l2);
+
+    options = new QScrollArea;
+    options->setWidget(options_widget);
+    options->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    options->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    options->setSizeAdjustPolicy(QAbstractScrollArea::AdjustToContentsOnFirstShow);
+
+    l3 = new QVBoxLayout;
+    l3->addWidget(options, 1);
+    l3->addStretch();
+    l3->addWidget(global_progress);
 
     options_widget = new QWidget;
     options_widget->setLayout(l2);
@@ -325,6 +363,13 @@ window::~window(void)
     delete options_widget;
     delete ldl;
     delete gl;
+    delete icp_m;
+    delete icp_m_label;
+    delete icp_p;
+    delete icp_p_label;
+    delete icp_n;
+    delete icp_n_label;
+    delete icp;
     delete rng;
     delete k;
     delete k_label;
@@ -509,4 +554,14 @@ void window::recalc_normals(void)
     }
 
     gl->invalidate();
+}
+
+
+void window::do_icp(void)
+{
+    try {
+        cm.icp(icp_m->value(), icp_n->value(), icp_p->value());
+    } catch (const std::exception &e) {
+        QMessageBox::critical(this, "Error", QString("Could not do ICP: ") + QString(e.what()));
+    }
 }
