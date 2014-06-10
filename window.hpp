@@ -11,6 +11,7 @@
 #include <QPushButton>
 #include <QFrame>
 #include <QComboBox>
+#include <QScrollArea>
 
 #include "render_output.hpp"
 
@@ -36,11 +37,12 @@ class window:
         void recalc_normals(void);
 
     private:
-        QWidget *i_hate_qt;
+        QWidget *i_hate_qt, *options_widget;
 
         render_output *gl;
         QHBoxLayout *l1, *ldl;
-        QVBoxLayout *l2;
+        QVBoxLayout *l2, *l3;
+        QScrollArea *options;
         QFrame *f[6];
         QCheckBox *smooth_points, *lighting, *colored, *rng, *renormal_inv;
         QDoubleSpinBox *point_size, *normal_length, *fov, *ld_x, *ld_y, *ld_z, *cull_ratio;
