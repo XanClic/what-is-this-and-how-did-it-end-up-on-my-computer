@@ -687,3 +687,18 @@ void cloud_manager::icp(size_t m, size_t n, float p)
 
     reset_progress();
 }
+
+
+void cloud_manager::randomize_transformations(void)
+{
+    std::default_random_engine rng(std::chrono::system_clock::now().time_since_epoch().count());
+    std::uniform_real_distribution<float> trans_x(-5.f, 5.f), trans_y(-5.f, 5.f), trans_z(-5.f, 5.f);
+    std::uniform_real_distribution<float> rot_x(-1.f, 1.f), rot_y(-1.f, 1.f), rot_z(-1.f, 1.f), rot_a(0.f, 2.f * static_cast<float>(M_PI));
+
+    for (cloud &c: clouds()) {
+        c.transformation() = mat4::identity().rotated(rot_a(rng), vec3(rot_x(rng), rot_y(rng), rot_z(rng)))
+                                             .translated(vec3(trans_x(rng), trans_y(rng), trans_z(rng)));
+    }
+
+    ro->invalidate();
+}

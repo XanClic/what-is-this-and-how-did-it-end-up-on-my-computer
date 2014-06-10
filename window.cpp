@@ -173,6 +173,7 @@ window::window(void):
     // (buttons and stuff)
     store = new QPushButton("Store this cloud");
     unload = new QPushButton("Unload this cloud");
+    rnd_trans = new QPushButton("Randomize transformations");
     unify = new QPushButton("Unify all clouds");
     unify_res = new QDoubleSpinBox;
     unify_res->setDecimals(4);
@@ -248,6 +249,7 @@ window::window(void):
     l2->addWidget(clouds);
     l2->addWidget(store);
     l2->addWidget(unload);
+    l2->addWidget(rnd_trans);
     l2->addWidget(unify);
     l2->addWidget(unify_res);
     l2->addWidget(f[0]);
@@ -317,6 +319,7 @@ window::window(void):
     connect(load, SIGNAL(pressed()), this, SLOT(load_cloud()));
     connect(store, SIGNAL(pressed()), this, SLOT(store_cloud()));
     connect(unload, SIGNAL(pressed()), this, SLOT(unload_cloud()));
+    connect(rnd_trans, SIGNAL(pressed()), this, SLOT(randomize_transformations()));
     connect(cull, SIGNAL(pressed()), this, SLOT(do_cull()));
     connect(renormal, SIGNAL(pressed()), this, SLOT(recalc_normals()));
     connect(icp, SIGNAL(pressed()), this, SLOT(do_icp()));
@@ -401,6 +404,7 @@ window::~window(void)
     delete smooth_points;
     delete unify_res;
     delete unify;
+    delete rnd_trans;
     delete unload;
     delete store;
     delete clouds;
@@ -572,4 +576,10 @@ void window::do_icp(void)
     } catch (const std::exception &e) {
         QMessageBox::critical(this, "Error", QString("Could not do ICP: ") + QString(e.what()));
     }
+}
+
+
+void window::randomize_transformations(void)
+{
+    cm.randomize_transformations();
 }

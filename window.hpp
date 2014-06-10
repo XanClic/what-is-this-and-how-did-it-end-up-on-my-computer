@@ -36,6 +36,7 @@ class window:
         void do_cull(void);
         void recalc_normals(void);
         void do_icp(void);
+        void randomize_transformations(void);
 
     private:
         QWidget *i_hate_qt, *options_widget;
@@ -48,7 +49,7 @@ class window:
         QCheckBox *smooth_points, *lighting, *colored, *rng, *renormal_inv;
         QDoubleSpinBox *point_size, *normal_length, *fov, *ld_x, *ld_y, *ld_z, *cull_ratio, *icp_p;
         QLabel *point_size_label, *normal_length_label, *fov_label, *ld, *k_label, *cull_ratio_label, *icp_n_label, *icp_m_label, *icp_p_label;
-        QPushButton *unify, *load, *store, *unload, *cull, *renormal, *icp;
+        QPushButton *unify, *load, *store, *unload, *cull, *renormal, *icp, *rnd_trans;
         QDoubleSpinBox *unify_res;
         QComboBox *clouds;
         QSpinBox *k, *icp_n, *icp_m;

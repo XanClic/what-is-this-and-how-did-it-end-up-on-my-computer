@@ -190,6 +190,7 @@ class cloud_manager {
         void load_new(std::ifstream &s, const std::string &name = "(unnamed)");
         void unify(float resolution, const std::string &name = "(unnamed)");
         void icp(size_t m, size_t n, float p);
+        void randomize_transformations(void);
 
 
     private:
