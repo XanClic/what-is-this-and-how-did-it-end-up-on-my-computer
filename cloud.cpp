@@ -1,6 +1,7 @@
 #include <dake/gl/gl.hpp>
 
 #include <cassert>
+#include <chrono>
 #include <cmath>
 #include <iostream>
 #include <fstream>
@@ -578,7 +579,7 @@ void cloud_manager::icp(render_output *ro, size_t m, size_t n, float p)
 
     std::vector<correspondence> correspondences;
     std::vector<const point *> remaining_points;
-    std::default_random_engine rng;
+    std::default_random_engine rng(std::chrono::system_clock::now().time_since_epoch().count());
 
     kd_tree<3> kdt(c->back());
 
