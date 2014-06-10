@@ -353,10 +353,16 @@ window::window(void):
     l1->addLayout(l3);
 
     i_hate_qt->setLayout(l1);
+
+
+    cm.set_render_output(gl);
 }
 
 window::~window(void)
 {
+    cm.set_render_output(nullptr);
+
+
     delete l1;
     delete l2;
     delete l3;
@@ -562,7 +568,7 @@ void window::recalc_normals(void)
 void window::do_icp(void)
 {
     try {
-        cm.icp(gl, icp_m->value(), icp_n->value(), icp_p->value());
+        cm.icp(icp_m->value(), icp_n->value(), icp_p->value());
     } catch (const std::exception &e) {
         QMessageBox::critical(this, "Error", QString("Could not do ICP: ") + QString(e.what()));
     }

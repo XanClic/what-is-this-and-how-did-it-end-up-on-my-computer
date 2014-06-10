@@ -557,7 +557,7 @@ struct correspondence {
 };
 
 
-void cloud_manager::icp(render_output *ro, size_t m, size_t n, float p)
+void cloud_manager::icp(size_t m, size_t n, float p)
 {
     if (c->size() != 2) {
         throw std::invalid_argument("ICP can only be done iff exactly two point clouds are loaded");
