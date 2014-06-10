@@ -245,7 +245,7 @@ void render_output::paintGL(void)
             if (lighting && light_dir.length()) {
                 prg->uniform<mat3>("nmat") = norm;
                 if (reload_uniforms) {
-                    prg->uniform<vec3>("light_dir") = mat3(mv) * light_dir.normalized();
+                    prg->uniform<vec3>("light_dir") = light_dir.normalized();
                 }
             }
         }
