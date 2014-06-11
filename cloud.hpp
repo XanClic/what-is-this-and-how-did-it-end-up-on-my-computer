@@ -93,8 +93,7 @@ class cloud {
 
             for (const cloud &c: input) {
                 const mat4 &pos_trans = c.trans;
-                mat3 norm_trans(pos_trans);
-                norm_trans.transposed_invert();
+                mat3 norm_trans(mat3(pos_trans).transposed_inverse());
 
                 for (const point &p: c.points()) {
                     vec3 global_pos(pos_trans * vec4(p.position.x(), p.position.y(), p.position.z(), 1.f));
