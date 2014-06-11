@@ -235,8 +235,7 @@ void render_output::paintGL(void)
     for (cloud &c: cm.clouds()) {
         if (reload_uniforms || multicloud) {
             mv = this->mv * c.transformation();
-            norm = mv;
-            norm.transposed_invert();
+            norm = mat3(mv).transposed_inverse();
         }
 
         gl::program *prg = select_program(false);
