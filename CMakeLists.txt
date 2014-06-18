@@ -86,7 +86,25 @@ if(WIN32)
     # If you've come here because you're trying to compile this on Windows and
     # the path given here is not found or something, you have my deepest pity.
     # Also, please use Linux or BSD or something.
-    target_link_libraries(cg2p1 libdake.a ${OPENGL_LIBRARIES} "C:/MinGW/mingw64/mingw64/bin/glew32.dll" glew32.lib)
+    #
+    # Okay, this comment is from some weeks later: I tried -lglew32. LD then
+    # uses only glew32.lib, which is apparently not enough (undefined references
+    # to __imp__glewGetUniformLocation and others). But I did realize something
+    # different: I don't need the .lib at all! The .dll itself is enough
+    # (glew32s.lib does not work either). Okay, this doesn't solve my original
+    # problem (LD using the .lib instead of the .dll, unless *the full path is
+    # specified*), so there's that. But still great, isn't it? I feel great.
+    # Don't you? I know I do.
+    #
+    # Also, I just returned here from fixing ICP for Windows which needs some
+    # completely useless reset of the target cloud's transformation matrix to
+    # work (??!??!), so I'm a bit pissed right now.
+    #
+    # Oh, the "MX Release" of GLEW does not work either. Yay! Good times.
+    #
+    # I just decided to add some environment variable. Now you can't blame me
+    # anymore! I feel a bit proud of myself.
+    target_link_libraries(cg2p1 libdake.a ${OPENGL_LIBRARIES} "$ENV{GLEW_DLL_PATH}")
 else(WIN32)
     target_link_libraries(cg2p1 libdake.a ${OPENGL_LIBRARIES})
 endif(WIN32)
