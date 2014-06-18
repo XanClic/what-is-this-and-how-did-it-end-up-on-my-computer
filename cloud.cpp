@@ -585,6 +585,24 @@ void cloud_manager::icp(size_t m, size_t n, float p)
 
     int thread_count = std::thread::hardware_concurrency();
 
+#ifdef __MINGW32__
+    // I am in fact aware that this is not part of the original ICP algorithm -
+    // however, the following code does not what it's supposed to do on Windows
+    // otherwise. I have no explanations, you have my deepest apologies but I
+    // suggest you just use Linux if you want to have working stuff.
+    c->front().transformation() = mat4::identity();
+
+    // I really have no idea why it would work on Linux but not on Windows.
+    // These are mainly just plain calculations (only shuffling and threading
+    // may influence this in some system-specific way), so it should just work
+    // on both. But it doesn't: The transformation found on Windows is unstable
+    // and in about 90 % of the cases not optimal at all and I can see no reason
+    // whatsoever why that should be the case.
+    // Both matrix libraries are the same on both systems (Eigen3 and dake) and
+    // the compiler is the same as well (GCC, although it does have some
+    // problems on Windows - it segfaulted more than once).
+#endif
+
     for (size_t iteration = 0; iteration < m; iteration++) {
         correspondences.resize(n);
 
