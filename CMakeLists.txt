@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 2.8.8)
 
 include(ExternalProject)
+include(FindPkgConfig)
 
 project(cg2p1)
 
@@ -10,6 +11,8 @@ set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 find_package(OpenGL REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Core Gui OpenGL)
 find_package(Eigen3 REQUIRED)
+
+pkg_search_module(LIBEPOXY REQUIRED epoxy)
 
 ExternalProject_Add(
     dake
@@ -24,8 +27,11 @@ ExternalProject_Add(
 
 ExternalProject_Get_Property(dake binary_dir)
 
-include_directories(${binary_dir}/include ${EIGEN3_INCLUDE_DIR})
+include_directories(${binary_dir}/include ${EIGEN3_INCLUDE_DIR} ${LIBEPOXY_INCLUDE_DIRS})
 link_directories(${binary_dir})
+
+set(THREAD_CXXFLAGS -pthread)
+set(THREAD_LIBS pthread)
 
 add_executable(cg2p1 main.cpp cloud.cpp window.cpp render_output.cpp shader_sources.cpp kd_tree.cpp rng.cpp)
 if(WIN32)
@@ -104,12 +110,12 @@ if(WIN32)
     #
     # I just decided to add some environment variable. Now you can't blame me
     # anymore! I feel a bit proud of myself.
-    target_link_libraries(cg2p1 libdake.a ${OPENGL_LIBRARIES} "$ENV{GLEW_DLL_PATH}")
+    target_link_libraries(cg2p1 libdake.a ${OPENGL_LIBRARIES} "$ENV{GLEW_DLL_PATH}" ${LIBEPOXY_LIBRARIES} ${THREAD_LIBS} m)
 else(WIN32)
-    target_link_libraries(cg2p1 libdake.a ${OPENGL_LIBRARIES})
+    target_link_libraries(cg2p1 libdake.a ${OPENGL_LIBRARIES} ${LIBEPOXY_LIBRARIES} ${THREAD_LIBS} m)
 endif(WIN32)
 add_dependencies(cg2p1 dake)
 
-set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -g2 -Wall -Wextra")
+set(CMAKE_CXX_FLAGS "-std=c++11 -O3 -g2 -Wall -Wextra ${THREAD_CXXFLAGS}")
 
 qt5_use_modules(cg2p1 Core Gui OpenGL)
